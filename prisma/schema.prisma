@@ -1,0 +1,244 @@
+/**
+ * Prisma Database Schema for Burning Sawals Application
+ * This schema defines the database structure for a question and answer platform
+ * with support for users, questions, genres, question types, and engagement tracking.
+ * Database: MySQL
+ * ORM: Prisma
+ * Key Features:
+ * - User management with email and phone uniqueness
+ * - Question management with authorship and curation tracking
+ * - Genre system with many-to-many relationships
+ * - Question type categorization
+ * - Engagement metrics (likes, super likes, dislikes)
+ * - Explicit join tables for many-to-many relationships
+ * @author abhisekadhikari
+ * @version 1.0.0
+ * @since 2025-07-25
+ */
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * User Model
+ * Represents registered users in the system
+ * @model User
+ * @description Stores user information including contact details and timestamps
+ * @table users
+ * Relationships:
+ * - One-to-many: User can author multiple questions
+ * - One-to-many: User can curate multiple questions (created_by relationship)
+ */
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique /// Unique email address for login/identification
+  name      String /// User's display name
+  phone     String   @unique /// Unique phone number for contact
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  /// Questions authored by this user
+  questions        Question[]
+  /// Questions curated/created by this user (different from authorship)
+  curatedQuestions Question[] @relation("QuestionsCreatedBy")
+
+  @@map("users")
+}
+
+/**
+ * Question Model
+ * Represents questions in the system with authorship and curation tracking
+ * @model Question
+ * @description Core entity for storing questions with dual user relationships
+ * @table questions
+ * Relationships:
+ * - Many-to-one: Question belongs to an author (User)
+ * - Many-to-one: Question optionally has a curator (User)
+ * - Many-to-many: Question can have multiple genres (via QuestionGenre)
+ * - One-to-many: Question can have multiple engagement records
+ */
+model Question {
+  id   Int    @id @default(autoincrement())
+  text String /// The actual question text
+
+  /// Author of the question (required)
+  authorId Int  @map("author_id")
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  /// Curator/creator of the question (optional, for content management)
+  createdById Int?  @map("created_by_id")
+  createdBy   User? @relation("QuestionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// Many-to-many relationship with genres via explicit join table
+  questionGenres QuestionGenre[]
+
+  /// Engagement metrics for this question
+  engagements Engagement[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([authorId])
+  @@index([createdById])
+  @@map("questions")
+}
+
+/**
+ * Genre Model
+ * Represents content categories/genres for questions and question types
+ * @model Genre
+ * @description Categories that can be applied to questions and question types
+ * @table genres
+ * Features:
+ * - Unique genre names to prevent duplicates
+ * - Many-to-many relationships with both questions and question types
+ * Relationships:
+ * - Many-to-many: Genre can be associated with multiple questions
+ * - Many-to-many: Genre can be associated with multiple question types
+ */
+model Genre {
+  id   Int    @id @default(autoincrement()) @map("genre_id")
+  name String @unique @map("genre_name") /// Unique genre name
+
+  /// Many-to-many relationships via explicit join tables
+  questionGenres     QuestionGenre[] /// Link to questions
+  questionTypeGenres QuestionTypeGenre[] /// Link to question types
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("genres")
+}
+
+/**
+ * QuestionType Model
+ * Represents different types/formats of questions (e.g., Multiple Choice, True/False)
+ * @model QuestionType
+ * @description Categorizes questions by their format or type
+ * @table question_type
+ * Features:
+ * - Unique question type names
+ * - Can be associated with multiple genres
+ * Relationships:
+ * - Many-to-many: QuestionType can be associated with multiple genres
+ */
+model QuestionType {
+  id   Int    @id @default(autoincrement()) @map("que_type_id")
+  name String @unique /// Unique question type name
+
+  /// Many-to-many relationship with genres via explicit join table
+  questionTypeGenres QuestionTypeGenre[]
+
+  @@map("question_type")
+}
+
+/**
+ * ============================================================================
+ * EXPLICIT JOIN TABLES FOR MANY-TO-MANY RELATIONSHIPS
+ * ============================================================================
+ * These models represent the junction tables for many-to-many relationships.
+ * They provide explicit control over the relationship data and allow for
+ * additional fields like timestamps and custom naming.
+ */
+
+/**
+ * QuestionGenre Join Table
+ * Links questions to their associated genres
+ * @model QuestionGenre
+ * @description Junction table for Question-Genre many-to-many relationship
+ * @table question_genres
+ * Features:
+ * - Composite primary key (questionId, genreId)
+ * - Cascade deletes when either question or genre is deleted
+ * - Creation timestamp for audit purposes
+ * - Indexed foreign keys for performance
+ */
+model QuestionGenre {
+  questionId Int @map("questionId") /// Foreign key to Question
+  genreId    Int @map("genre_id") /// Foreign key to Genre
+
+  /// Foreign key relationships with cascade delete
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  genre    Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([questionId, genreId]) /// Composite primary key
+  @@index([genreId]) /// Index for performance
+  @@index([questionId]) /// Index for performance
+  @@map("question_genres")
+}
+
+/**
+ * QuestionTypeGenre Join Table
+ * Links question types to their associated genres
+ * @model QuestionTypeGenre
+ * @description Junction table for QuestionType-Genre many-to-many relationship
+ * @table question_type_genres
+ * Features:
+ * - Composite primary key (questionTypeId, genreId)
+ * - Cascade deletes when either question type or genre is deleted
+ * - Creation timestamp for audit purposes
+ * - Indexed foreign keys for performance
+ */
+model QuestionTypeGenre {
+  questionTypeId Int @map("que_type_id") /// Foreign key to QuestionType
+  genreId        Int @map("genre_id") /// Foreign key to Genre
+
+  /// Foreign key relationships with cascade delete
+  questionType QuestionType @relation(fields: [questionTypeId], references: [id], onDelete: Cascade)
+  genre        Genre        @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([questionTypeId, genreId]) /// Composite primary key
+  @@index([genreId]) /// Index for performance
+  @@index([questionTypeId]) /// Index for performance
+  @@map("question_type_genres")
+}
+
+/**
+ * ============================================================================
+ * ENGAGEMENT TRACKING
+ * ============================================================================
+ */
+
+/**
+ * Engagement Model
+ * Tracks user engagement metrics for questions
+ * @model Engagement
+ * @description Stores like, super like, and dislike counts for questions
+ * @table engagements
+ * Features:
+ * - One engagement record per question (unique constraint)
+ * - Separate counters for different engagement types
+ * - Cascade delete when question is deleted
+ * - Default values for all counters (0)
+ * Relationships:
+ * - Many-to-one: Engagement belongs to one Question
+ */
+model Engagement {
+  id Int @id @default(autoincrement())
+
+  /// Foreign key to the question being engaged with
+  questionId Int      @map("question_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  /// Engagement counters with default values
+  like      Int @default(0) /// Regular like count
+  superLike Int @default(0) @map("super_like") /// Super like count
+  dislike   Int @default(0) /// Dislike count
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([questionId]) /// One engagement record per question
+  @@index([questionId]) /// Index for performance
+  @@map("engagements")
+}
