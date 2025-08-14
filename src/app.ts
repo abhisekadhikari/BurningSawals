@@ -10,6 +10,7 @@ import express, { NextFunction, Request, Response } from "express";
 import genereRouter from "./routes/genere.routes";
 import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
+import questionRouer from "./routes/question.routes";
 
 /**
  * Express application instance
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 // API Routes
 app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
+app.use("/api/questions", questionRouer);
 
 /**
  * Global error handling middleware
