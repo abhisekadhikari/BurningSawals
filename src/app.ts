@@ -47,6 +47,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
  * Start the Express server
  * Listens on port 8080 and logs a startup message
  */
-app.listen(8080, () => {
+app.listen(process.env.PORT ?? 8080, () => {
     console.log("Server Started.");
 });
