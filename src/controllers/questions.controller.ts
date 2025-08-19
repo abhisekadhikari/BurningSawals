@@ -6,17 +6,13 @@ import { ApiResponse } from "../utils/ApiResponse";
 
 type QuestionBody = {
     question?: string;
-    genre_ids?: number[]; // ✅ preferred
-    question_geners?: number[]; // legacy/typo support
+    genre_ids?: number[];
+    question_geners?: number[];
 };
 
 const toIdArray = (v: unknown): number[] =>
     Array.isArray(v)
-        ? [
-              ...new Set( // dedupe to avoid unique constraint errors on the join
-                  v.map(Number).filter((n) => Number.isFinite(n) && n > 0)
-              ),
-          ]
+        ? [...new Set(v.map(Number).filter((n) => Number.isFinite(n) && n > 0))]
         : [];
 
 export const createQuestion = asyncHandler(
@@ -51,7 +47,7 @@ export const createQuestion = asyncHandler(
         const created = await prisma.question.create({
             data: {
                 text: question.trim(),
-                authorId,
+                //authorId,
                 questionGenres: {
                     create: ids.map((gid) => ({
                         genre: { connect: { id: gid } },
@@ -80,5 +76,43 @@ export const createQuestion = asyncHandler(
                     created
                 )
             );
+    }
+);
+
+export const getQuestionsByGenre = asyncHandler(
+    async (req: Request<{ genre_id: string }>, res) => {
+        const genreId = Number(req.params.genre_id);
+        if (Number.isNaN(genreId)) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "Invalid genre_id",
+                errors: ["genre_id must be a number"],
+            });
+        }
+
+        const questions = await prisma.question.findMany({
+            where: {
+                questionGenres: {
+                    some: { genreId },
+                },
+            },
+        });
+
+        if (!questions || questions.length === 0) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "No question is linked to this genre id",
+                errors: [],
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Questions retrieved successfully",
+            data: questions,
+        });
     }
 );

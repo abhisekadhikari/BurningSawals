@@ -44,9 +44,7 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   /// Questions authored by this user
-  questions        Question[]
-  /// Questions curated/created by this user (different from authorship)
-  curatedQuestions Question[] @relation("QuestionsCreatedBy")
+  questions Question[]
 
   @@map("users")
 }
@@ -68,12 +66,8 @@ model Question {
   text String /// The actual question text
 
   /// Author of the question (required)
-  authorId Int  @map("author_id")
-  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  /// Curator/creator of the question (optional, for content management)
-  createdById Int?  @map("created_by_id")
-  createdBy   User? @relation("QuestionsCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  authorId Int?  @map("author_id")
+  author   User? @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   /// Many-to-many relationship with genres via explicit join table
   questionGenres QuestionGenre[]
@@ -85,7 +79,6 @@ model Question {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([authorId])
-  @@index([createdById])
   @@map("questions")
 }
 
