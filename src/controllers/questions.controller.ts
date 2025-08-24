@@ -7,26 +7,26 @@ import { ApiResponse } from "../utils/ApiResponse";
 type QuestionBody = {
     question?: string;
     genre_ids?: number[];
-    question_geners?: number[];
 };
 
+// Utility: normalize to array of positive ints
 const toIdArray = (v: unknown): number[] =>
     Array.isArray(v)
         ? [...new Set(v.map(Number).filter((n) => Number.isFinite(n) && n > 0))]
         : [];
 
+// ------------------------ CREATE ------------------------
 export const createQuestion = asyncHandler(
     async (req: Request<{}, {}, QuestionBody>, res: Response) => {
-        const { question, genre_ids, question_geners } = req.body || {};
+        const { question, genre_ids } = req.body || {};
 
-        // Basic validations
         if (!question || typeof question !== "string" || !question.trim()) {
             return res
                 .status(400)
                 .json(ApiResponse.success(400, "question is required", null));
         }
 
-        const ids = toIdArray(genre_ids ?? question_geners);
+        const ids = toIdArray(genre_ids);
         if (ids.length === 0) {
             return res
                 .status(400)
@@ -39,29 +39,20 @@ export const createQuestion = asyncHandler(
                 );
         }
 
-        // TODO: pull the authorId from your auth context (e.g., req.user.id)
-        const authorId = 1;
-
-        // Create question + link genres via explicit M2M (QuestionGenre)
-        // Use nested `create` (not `createMany`) inside relation.
-        const created = await prisma.question.create({
+        // Create question
+        const created = await prisma.questions.create({
             data: {
-                text: question.trim(),
-                //authorId,
-                questionGenres: {
+                question: question.trim(),
+                question_genre_mappings: {
                     create: ids.map((gid) => ({
-                        genre: { connect: { id: gid } },
+                        genres: { connect: { genre_id: gid } },
                     })),
                 },
             },
-            select: {
-                id: true,
-                text: true,
-                authorId: true,
-                createdAt: true,
-                questionGenres: {
-                    select: {
-                        genre: { select: { id: true, name: true } },
+            include: {
+                question_genre_mappings: {
+                    include: {
+                        genres: { select: { genre_id: true, name: true } },
                     },
                 },
             },
@@ -79,73 +70,101 @@ export const createQuestion = asyncHandler(
     }
 );
 
+// ------------------------ GET by GENRE ------------------------
 export const getQuestionsByGenre = asyncHandler(
     async (req: Request<{ genre_id: string }>, res) => {
         const genreId = Number(req.params.genre_id);
         if (Number.isNaN(genreId)) {
-            return res.status(400).json({
-                success: false,
-                status: 400,
-                message: "Invalid genre_id",
-                errors: ["genre_id must be a number"],
-            });
+            return res
+                .status(400)
+                .json(ApiResponse.success(400, "invalid genre_id", null));
         }
 
-        const questions = await prisma.question.findMany({
+        const questions = await prisma.questions.findMany({
             where: {
-                questionGenres: {
-                    some: { genreId },
+                question_genre_mappings: {
+                    some: { genre_id: genreId },
+                },
+            },
+            include: {
+                question_genre_mappings: {
+                    include: {
+                        genres: { select: { genre_id: true, name: true } },
+                    },
                 },
             },
         });
 
-        if (!questions || questions.length === 0) {
-            return res.status(404).json({
-                success: false,
-                status: 404,
-                message: "No question is linked to this genre id",
-                errors: [],
-            });
+        if (!questions.length) {
+            return res
+                .status(404)
+                .json(
+                    ApiResponse.success(
+                        404,
+                        "no questions linked to this genre",
+                        []
+                    )
+                );
         }
 
-        return res.status(200).json({
-            success: true,
-            status: 200,
-            message: "Questions retrieved successfully",
-            data: questions,
-        });
+        return res
+            .status(200)
+            .json(
+                ApiResponse.success(
+                    200,
+                    "questions retrieved successfully",
+                    questions
+                )
+            );
     }
 );
 
+// ------------------------ UPDATE ------------------------
 export const updateQuestion = asyncHandler(
     async (
         req: Request<{ question_id: string }, {}, QuestionBody>,
         res: Response
     ) => {
-        const { question, question_geners } = req.body || {};
-        const { question_id } = req.params;
+        const qid = Number(req.params.question_id);
+        const { question, genre_ids } = req.body || {};
 
-        const result = await prisma.question.update({
+        if (Number.isNaN(qid)) {
+            return res
+                .status(400)
+                .json(ApiResponse.success(400, "invalid question_id", null));
+        }
+
+        // Clean genre_ids
+        const ids = toIdArray(genre_ids);
+
+        // Update question text
+        const updated = await prisma.questions.update({
+            where: { question_id: qid },
             data: {
-                text: question,
-                // authorId: 1,
-                questionGenres: {
-                    update: {
-                        data: {
-                            genre: {
-                                connect: {
-                                    id: 1
-                                }
-                            }
-                        }
-                    }
-                },
+                ...(question ? { question: question.trim() } : {}),
+                ...(ids.length
+                    ? {
+                          // Reset existing mappings, then add new ones
+                          question_genre_mappings: {
+                              deleteMany: {}, // remove all current mappings
+                              create: ids.map((gid) => ({
+                                  genres: { connect: { genre_id: gid } },
+                              })),
+                          },
+                      }
+                    : {}),
             },
-            where: {
-                id: Number(question_id),
+            include: {
+                question_genre_mappings: {
+                    include: {
+                        genres: { select: { genre_id: true, name: true } },
+                    },
+                },
             },
         });
 
-        res.status(200).json(result);
+        res.status(200).json(
+            ApiResponse.success(200, "question updated successfully", updated)
+        );
     }
 );
