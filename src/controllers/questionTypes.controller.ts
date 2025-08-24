@@ -1,4 +1,3 @@
-// src/controllers/questionTypes.controller.ts
 import { Request, Response } from "express";
 import { prisma } from "../utils/prisma";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -135,13 +134,11 @@ export const renameQuestionType = asyncHandler(
         } catch (err: unknown) {
             if (err instanceof Prisma.PrismaClientKnownRequestError) {
                 if (err.code === "P2025") {
-                    return res
-                        .status(404)
-                        .json(
-                            ApiResponse.error(404, "question type not found", {
-                                id,
-                            })
-                        );
+                    return res.status(404).json(
+                        ApiResponse.error(404, "question type not found", {
+                            id,
+                        })
+                    );
                 }
                 if (err.code === "P2002") {
                     return res.status(409).json(
@@ -186,13 +183,11 @@ export const deleteQuestionType = asyncHandler(
         } catch (err: unknown) {
             if (err instanceof Prisma.PrismaClientKnownRequestError) {
                 if (err.code === "P2025") {
-                    return res
-                        .status(404)
-                        .json(
-                            ApiResponse.error(404, "question type not found", {
-                                id,
-                            })
-                        );
+                    return res.status(404).json(
+                        ApiResponse.error(404, "question type not found", {
+                            id,
+                        })
+                    );
                 }
                 if (err.code === "P2003") {
                     return res

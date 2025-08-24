@@ -1,4 +1,3 @@
-// src/controllers/genres.controller.ts
 import { Request, Response } from "express";
 import { prisma } from "../utils/prisma";
 import { ApiResponse } from "../utils/ApiResponse";
@@ -126,13 +125,11 @@ export const deleteGenre = asyncHandler(
 
         try {
             await prisma.genres.delete({ where: { genre_id: BigInt(id) } });
-            return res
-                .status(200)
-                .json(
-                    ApiResponse.success(200, "genre deleted successfully", {
-                        id,
-                    })
-                );
+            return res.status(200).json(
+                ApiResponse.success(200, "genre deleted successfully", {
+                    id,
+                })
+            );
         } catch (err: unknown) {
             if (err instanceof Prisma.PrismaClientKnownRequestError) {
                 if (err.code === "P2025") {

@@ -1,4 +1,3 @@
-// src/controllers/questions.controller.ts
 import { Request, Response } from "express";
 import asyncHandler from "../utils/asyncHandler";
 import { prisma } from "../utils/prisma";
