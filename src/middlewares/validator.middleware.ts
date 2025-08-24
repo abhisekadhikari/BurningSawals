@@ -7,7 +7,6 @@
  */
 
 import { ZodObject } from "zod";
-import { Request, Response, NextFunction } from "express";
 
 /**
  * Middleware factory function that creates Zod validation middleware for Express routes
@@ -35,17 +34,33 @@ import { Request, Response, NextFunction } from "express";
  * The validated and potentially transformed data is available in req[source] after
  * successful validation (Zod can transform data during validation).
  */
+import { ZodError } from "zod";
+import { Request, Response, NextFunction } from "express";
+
 export const validator =
     (schema: ZodObject<any>, source: "body" | "params" | "query" = "body") =>
     (req: Request, res: Response, next: NextFunction) => {
         try {
             schema.parse(req[source]);
             next();
-        } catch (err: any) {
-            res.status(400).json({
-                status: 400,
-                message: "Validation error",
-                errors: err.errors || err,
-            });
+        } catch (err: unknown) {
+            if (err instanceof ZodError) {
+                const formattedErrors = err.issues.map((e) => ({
+                    path: e.path.join("."), // e.g. "user.email"
+                    message: e.message,
+                }));
+
+                res.status(400).json({
+                    status: 400,
+                    message: "Validation error",
+                    errors: formattedErrors,
+                });
+            } else {
+                res.status(400).json({
+                    status: 400,
+                    message: "Validation error",
+                    errors: [{ path: "", message: "Unknown validation error" }],
+                });
+            }
         }
     };

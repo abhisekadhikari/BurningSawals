@@ -10,6 +10,7 @@ import express, { NextFunction, Request, Response } from "express";
 import genereRouter from "./routes/genere.routes";
 import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
+import questionRouer from "./routes/question.routes";
 
 /**
  * Express application instance
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: false }));
 // API Routes
 app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
+app.use("/api/questions", questionRouer);
 
 /**
  * Global error handling middleware
@@ -45,6 +47,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
  * Start the Express server
  * Listens on port 8080 and logs a startup message
  */
-app.listen(8080, () => {
-    console.log("Server Started.");
+const PORT = process.env.PORT ?? 8080;
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+
+app.listen(PORT, () => {
+    console.log("🚀 Server started successfully");
+    console.log(`📡 Listening on: http://localhost:${PORT}`);
+    console.log(`🌍 Environment: ${NODE_ENV}`);
 });
