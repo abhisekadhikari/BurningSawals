@@ -116,3 +116,36 @@ export const getQuestionsByGenre = asyncHandler(
         });
     }
 );
+
+export const updateQuestion = asyncHandler(
+    async (
+        req: Request<{ question_id: string }, {}, QuestionBody>,
+        res: Response
+    ) => {
+        const { question, question_geners } = req.body || {};
+        const { question_id } = req.params;
+
+        const result = await prisma.question.update({
+            data: {
+                text: question,
+                // authorId: 1,
+                questionGenres: {
+                    update: {
+                        data: {
+                            genre: {
+                                connect: {
+                                    id: 1
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+            where: {
+                id: Number(question_id),
+            },
+        });
+
+        res.status(200).json(result);
+    }
+);
