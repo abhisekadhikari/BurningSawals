@@ -15,6 +15,19 @@ const toIdArray = (v: unknown): number[] =>
         ? [...new Set(v.map(Number).filter((n) => Number.isFinite(n) && n > 0))]
         : [];
 
+/** DTO helpers for BigInt → Number */
+const toQuestionDTO = (q: any) => ({
+    question_id: Number(q.question_id),
+    question: q.question,
+    created_at: q.created_at,
+    updated_at: q.updated_at,
+    genres:
+        q.question_genre_mappings?.map((m: any) => ({
+            genre_id: Number(m.genres.genre_id),
+            name: m.genres.name,
+        })) ?? [],
+});
+
 // ------------------------ CREATE ------------------------
 export const createQuestion = asyncHandler(
     async (req: Request<{}, {}, QuestionBody>, res: Response) => {
@@ -23,7 +36,7 @@ export const createQuestion = asyncHandler(
         if (!question || typeof question !== "string" || !question.trim()) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "question is required", null));
+                .json(ApiResponse.error(400, "question is required", null));
         }
 
         const ids = toIdArray(genre_ids);
@@ -31,7 +44,7 @@ export const createQuestion = asyncHandler(
             return res
                 .status(400)
                 .json(
-                    ApiResponse.success(
+                    ApiResponse.error(
                         400,
                         "provide at least one genre id in genre_ids",
                         null
@@ -39,13 +52,12 @@ export const createQuestion = asyncHandler(
                 );
         }
 
-        // Create question
         const created = await prisma.questions.create({
             data: {
                 question: question.trim(),
                 question_genre_mappings: {
                     create: ids.map((gid) => ({
-                        genres: { connect: { genre_id: gid } },
+                        genres: { connect: { genre_id: BigInt(gid) } },
                     })),
                 },
             },
@@ -64,7 +76,7 @@ export const createQuestion = asyncHandler(
                 ApiResponse.success(
                     201,
                     "question created successfully",
-                    created
+                    toQuestionDTO(created)
                 )
             );
     }
@@ -72,18 +84,18 @@ export const createQuestion = asyncHandler(
 
 // ------------------------ GET by GENRE ------------------------
 export const getQuestionsByGenre = asyncHandler(
-    async (req: Request<{ genre_id: string }>, res) => {
+    async (req: Request<{ genre_id: string }>, res: Response) => {
         const genreId = Number(req.params.genre_id);
         if (Number.isNaN(genreId)) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid genre_id", null));
+                .json(ApiResponse.error(400, "invalid genre_id", null));
         }
 
         const questions = await prisma.questions.findMany({
             where: {
                 question_genre_mappings: {
-                    some: { genre_id: genreId },
+                    some: { genre_id: BigInt(genreId) },
                 },
             },
             include: {
@@ -99,7 +111,7 @@ export const getQuestionsByGenre = asyncHandler(
             return res
                 .status(404)
                 .json(
-                    ApiResponse.success(
+                    ApiResponse.error(
                         404,
                         "no questions linked to this genre",
                         []
@@ -113,7 +125,7 @@ export const getQuestionsByGenre = asyncHandler(
                 ApiResponse.success(
                     200,
                     "questions retrieved successfully",
-                    questions
+                    questions.map(toQuestionDTO)
                 )
             );
     }
@@ -131,24 +143,23 @@ export const updateQuestion = asyncHandler(
         if (Number.isNaN(qid)) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid question_id", null));
+                .json(ApiResponse.error(400, "invalid question_id", null));
         }
 
-        // Clean genre_ids
         const ids = toIdArray(genre_ids);
 
-        // Update question text
         const updated = await prisma.questions.update({
-            where: { question_id: qid },
+            where: { question_id: BigInt(qid) },
             data: {
                 ...(question ? { question: question.trim() } : {}),
                 ...(ids.length
                     ? {
-                          // Reset existing mappings, then add new ones
                           question_genre_mappings: {
                               deleteMany: {}, // remove all current mappings
                               create: ids.map((gid) => ({
-                                  genres: { connect: { genre_id: gid } },
+                                  genres: {
+                                      connect: { genre_id: BigInt(gid) },
+                                  },
                               })),
                           },
                       }
@@ -164,7 +175,11 @@ export const updateQuestion = asyncHandler(
         });
 
         res.status(200).json(
-            ApiResponse.success(200, "question updated successfully", updated)
+            ApiResponse.success(
+                200,
+                "question updated successfully",
+                toQuestionDTO(updated)
+            )
         );
     }
 );

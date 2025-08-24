@@ -19,6 +19,20 @@ const parseIdArray = (arr: unknown): number[] =>
         ? arr.map(Number).filter((n) => Number.isFinite(n) && n > 0)
         : [];
 
+/** DTO helpers to fix BigInt serialization */
+const toQuestionTypeDTO = (qt: any) => ({
+    type_id: Number(qt.type_id),
+    type_name: qt.type_name,
+    created_at: qt.created_at,
+    updated_at: qt.updated_at,
+    genres: qt.genres
+        ? qt.genres.map((g: any) => ({
+              genre_id: Number(g.genre_id),
+              name: g.name,
+          }))
+        : [],
+});
+
 // ------------------------ CREATE ------------------------
 export const createQuestionType = asyncHandler(
     async (req: Request<{}, {}, QTypeBody>, res: Response) => {
@@ -27,16 +41,21 @@ export const createQuestionType = asyncHandler(
         if (!type_name || typeof type_name !== "string" || !type_name.trim()) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "type_name is required", null));
+                .json(ApiResponse.error(400, "type_name is required", null));
         }
 
         try {
             const created = await prisma.question_types.create({
                 data: { type_name: cleanName(type_name) },
-                select: { type_id: true, type_name: true },
+                select: {
+                    type_id: true,
+                    type_name: true,
+                    created_at: true,
+                    updated_at: true,
+                },
             });
 
-            // optionally reassign existing genres to this type
+            // reassign genres if provided
             const ids = parseIdArray(genre_ids);
             if (ids.length > 0) {
                 await prisma.genres.updateMany({
@@ -47,9 +66,7 @@ export const createQuestionType = asyncHandler(
 
             const full = await prisma.question_types.findUnique({
                 where: { type_id: created.type_id },
-                include: {
-                    genres: { select: { genre_id: true, name: true } },
-                },
+                include: { genres: { select: { genre_id: true, name: true } } },
             });
 
             return res
@@ -58,7 +75,7 @@ export const createQuestionType = asyncHandler(
                     ApiResponse.success(
                         201,
                         "question type created successfully",
-                        full
+                        toQuestionTypeDTO(full)
                     )
                 );
         } catch (err: unknown) {
@@ -67,7 +84,7 @@ export const createQuestionType = asyncHandler(
                 err.code === "P2002"
             ) {
                 return res.status(409).json(
-                    ApiResponse.success(409, "question type already exists", {
+                    ApiResponse.error(409, "question type already exists", {
                         type_name: cleanName(type_name!),
                     })
                 );
@@ -86,19 +103,24 @@ export const renameQuestionType = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
         if (!type_name || typeof type_name !== "string" || !type_name.trim()) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "type_name is required", null));
+                .json(ApiResponse.error(400, "type_name is required", null));
         }
 
         try {
             const updated = await prisma.question_types.update({
-                where: { type_id: id },
+                where: { type_id: BigInt(id) },
                 data: { type_name: cleanName(type_name) },
-                select: { type_id: true, type_name: true },
+                select: {
+                    type_id: true,
+                    type_name: true,
+                    created_at: true,
+                    updated_at: true,
+                },
             });
 
             return res
@@ -107,7 +129,7 @@ export const renameQuestionType = asyncHandler(
                     ApiResponse.success(
                         200,
                         "question type renamed successfully",
-                        updated
+                        toQuestionTypeDTO(updated)
                     )
                 );
         } catch (err: unknown) {
@@ -116,16 +138,14 @@ export const renameQuestionType = asyncHandler(
                     return res
                         .status(404)
                         .json(
-                            ApiResponse.success(
-                                404,
-                                "question type not found",
-                                { id }
-                            )
+                            ApiResponse.error(404, "question type not found", {
+                                id,
+                            })
                         );
                 }
                 if (err.code === "P2002") {
                     return res.status(409).json(
-                        ApiResponse.success(
+                        ApiResponse.error(
                             409,
                             "question type name already in use",
                             {
@@ -147,11 +167,13 @@ export const deleteQuestionType = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
 
         try {
-            await prisma.question_types.delete({ where: { type_id: id } });
+            await prisma.question_types.delete({
+                where: { type_id: BigInt(id) },
+            });
             return res
                 .status(200)
                 .json(
@@ -167,18 +189,16 @@ export const deleteQuestionType = asyncHandler(
                     return res
                         .status(404)
                         .json(
-                            ApiResponse.success(
-                                404,
-                                "question type not found",
-                                { id }
-                            )
+                            ApiResponse.error(404, "question type not found", {
+                                id,
+                            })
                         );
                 }
                 if (err.code === "P2003") {
                     return res
                         .status(409)
                         .json(
-                            ApiResponse.success(
+                            ApiResponse.error(
                                 409,
                                 "cannot delete question type due to existing references",
                                 { id }
@@ -194,22 +214,19 @@ export const deleteQuestionType = asyncHandler(
 // ------------------------ GET ALL ------------------------
 export const getQuestionTypes = asyncHandler(
     async (_req: Request, res: Response) => {
-        const items = await prisma.question_types.findMany({
+        const rows = await prisma.question_types.findMany({
             orderBy: { type_name: "asc" },
-            include: {
-                genres: { select: { genre_id: true, name: true } },
-            },
+            include: { genres: { select: { genre_id: true, name: true } } },
         });
 
-        return res
-            .status(200)
-            .json(
-                ApiResponse.success(
-                    200,
-                    "question types fetched successfully",
-                    items
-                )
-            );
+        const data = rows.map(toQuestionTypeDTO);
+        res.status(200).json(
+            ApiResponse.success(
+                200,
+                "question types fetched successfully",
+                data
+            )
+        );
     }
 );
 
@@ -220,33 +237,29 @@ export const getQuestionTypeById = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
 
         const item = await prisma.question_types.findUnique({
-            where: { type_id: id },
-            include: {
-                genres: { select: { genre_id: true, name: true } },
-            },
+            where: { type_id: BigInt(id) },
+            include: { genres: { select: { genre_id: true, name: true } } },
         });
 
         if (!item) {
             return res
                 .status(404)
                 .json(
-                    ApiResponse.success(404, "question type not found", { id })
+                    ApiResponse.error(404, "question type not found", { id })
                 );
         }
 
-        return res
-            .status(200)
-            .json(
-                ApiResponse.success(
-                    200,
-                    "question type fetched successfully",
-                    item
-                )
-            );
+        res.status(200).json(
+            ApiResponse.success(
+                200,
+                "question type fetched successfully",
+                toQuestionTypeDTO(item)
+            )
+        );
     }
 );
 
@@ -260,7 +273,7 @@ export const addGenresToQuestionType = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
 
         const ids = parseIdArray(req.body?.genre_ids);
@@ -268,7 +281,7 @@ export const addGenresToQuestionType = asyncHandler(
             return res
                 .status(400)
                 .json(
-                    ApiResponse.success(
+                    ApiResponse.error(
                         400,
                         "genre_ids must be a non-empty array",
                         null
@@ -278,20 +291,22 @@ export const addGenresToQuestionType = asyncHandler(
 
         await prisma.genres.updateMany({
             where: { genre_id: { in: ids } },
-            data: { type_id: id },
+            data: { type_id: BigInt(id) },
         });
 
         const item = await prisma.question_types.findUnique({
-            where: { type_id: id },
-            include: {
-                genres: { select: { genre_id: true, name: true } },
-            },
+            where: { type_id: BigInt(id) },
+            include: { genres: { select: { genre_id: true, name: true } } },
         });
 
         return res
             .status(200)
             .json(
-                ApiResponse.success(200, "genres linked to question type", item)
+                ApiResponse.success(
+                    200,
+                    "genres linked to question type",
+                    toQuestionTypeDTO(item)
+                )
             );
     }
 );
@@ -306,7 +321,7 @@ export const removeGenresFromQuestionType = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
 
         const ids = parseIdArray(req.body?.genre_ids);
@@ -314,7 +329,7 @@ export const removeGenresFromQuestionType = asyncHandler(
             return res
                 .status(400)
                 .json(
-                    ApiResponse.success(
+                    ApiResponse.error(
                         400,
                         "genre_ids must be a non-empty array",
                         null
@@ -323,15 +338,13 @@ export const removeGenresFromQuestionType = asyncHandler(
         }
 
         await prisma.genres.updateMany({
-            where: { genre_id: { in: ids }, type_id: id },
-            data: { type_id: null }, // unlink
+            where: { genre_id: { in: ids }, type_id: BigInt(id) },
+            data: { type_id: null },
         });
 
         const item = await prisma.question_types.findUnique({
-            where: { type_id: id },
-            include: {
-                genres: { select: { genre_id: true, name: true } },
-            },
+            where: { type_id: BigInt(id) },
+            include: { genres: { select: { genre_id: true, name: true } } },
         });
 
         return res
@@ -340,7 +353,7 @@ export const removeGenresFromQuestionType = asyncHandler(
                 ApiResponse.success(
                     200,
                     "genres unlinked from question type",
-                    item
+                    toQuestionTypeDTO(item)
                 )
             );
     }

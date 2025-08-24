@@ -5,20 +5,16 @@ import { ApiResponse } from "../utils/ApiResponse";
 import asyncHandler from "../utils/asyncHandler";
 import { Prisma } from "@prisma/client";
 
-/** Request body types */
 type CreateGenreBody = { genre_name?: string; type_id?: number };
 type UpdateGenreBody = { genre_name?: string };
 
-/** Parse positive int -> number | null */
 const parseId = (raw: string): number | null => {
     const n = Number(raw);
     return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-/** Trim helper */
 const cleanName = (s: string) => s.trim();
 
-/** BigInt-safe mapping for JSON */
 const toGenreDTO = (g: {
     genre_id: bigint;
     type_id: bigint;
@@ -39,13 +35,11 @@ const toGenreWithRelsDTO = (g: any) => ({
     name: g.name,
     created_at: g.created_at,
     updated_at: g.updated_at,
-    // questions via mapping table
     questions:
         g.question_genre_mappings?.map((m: any) => ({
             question_id: Number(m.questions.question_id),
             question: m.questions.question,
         })) ?? [],
-    // type info
     type: g.question_types
         ? {
               type_id: Number(g.question_types.type_id),
@@ -54,10 +48,7 @@ const toGenreWithRelsDTO = (g: any) => ({
         : null,
 });
 
-/**
- * POST /api/genres
- * Body: { genre_name: string, type_id: number }
- */
+/** POST /api/genres */
 export const createGenre = asyncHandler(
     async (req: Request<{}, {}, CreateGenreBody>, res: Response) => {
         const { genre_name, type_id } = req.body || {};
@@ -68,12 +59,12 @@ export const createGenre = asyncHandler(
         ) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "genre_name is required", null));
+                .json(ApiResponse.error(400, "genre_name is required", null));
         }
         if (!type_id || !Number.isFinite(type_id) || type_id <= 0) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "type_id is required", null));
+                .json(ApiResponse.error(400, "type_id is required", null));
         }
 
         try {
@@ -103,24 +94,18 @@ export const createGenre = asyncHandler(
         } catch (err: unknown) {
             if (err instanceof Prisma.PrismaClientKnownRequestError) {
                 if (err.code === "P2002") {
-                    // unique (type_id, name) conflict if you added that unique key
                     return res.status(409).json(
-                        ApiResponse.success(409, "genre already exists", {
+                        ApiResponse.error(409, "genre already exists", {
                             type_id,
                             genre_name: cleanName(genre_name),
                         })
                     );
                 }
                 if (err.code === "P2003") {
-                    // FK to question_types failed
                     return res.status(400).json(
-                        ApiResponse.success(
-                            400,
-                            "invalid type_id (FK failed)",
-                            {
-                                type_id,
-                            }
-                        )
+                        ApiResponse.error(400, "invalid type_id (FK failed)", {
+                            type_id,
+                        })
                     );
                 }
             }
@@ -129,16 +114,14 @@ export const createGenre = asyncHandler(
     }
 );
 
-/**
- * DELETE /api/genres/:id
- */
+/** DELETE /api/genres/:id */
 export const deleteGenre = asyncHandler(
     async (req: Request<{ id: string }>, res: Response) => {
         const id = parseId(req.params.id);
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
 
         try {
@@ -150,27 +133,25 @@ export const deleteGenre = asyncHandler(
                         id,
                     })
                 );
-            // or 204 No Content if you prefer
         } catch (err: unknown) {
             if (err instanceof Prisma.PrismaClientKnownRequestError) {
                 if (err.code === "P2025") {
                     return res
                         .status(404)
                         .json(
-                            ApiResponse.success(404, "genre not found", { id })
+                            ApiResponse.error(404, "genre not found", { id })
                         );
                 }
                 if (err.code === "P2003") {
-                    // if you *didn't* enable ON DELETE CASCADE and mappings exist
-                    return res.status(409).json(
-                        ApiResponse.success(
-                            409,
-                            "cannot delete genre due to existing references",
-                            {
-                                id,
-                            }
-                        )
-                    );
+                    return res
+                        .status(409)
+                        .json(
+                            ApiResponse.error(
+                                409,
+                                "cannot delete genre due to existing references",
+                                { id }
+                            )
+                        );
                 }
             }
             throw err;
@@ -178,10 +159,7 @@ export const deleteGenre = asyncHandler(
     }
 );
 
-/**
- * PATCH /api/genres/:id
- * Body: { genre_name: string }
- */
+/** PATCH /api/genres/:id */
 export const renameGenre = asyncHandler(
     async (
         req: Request<{ id: string }, {}, UpdateGenreBody>,
@@ -193,7 +171,7 @@ export const renameGenre = asyncHandler(
         if (!id) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "invalid id parameter", null));
+                .json(ApiResponse.error(400, "invalid id parameter", null));
         }
         if (
             !genre_name ||
@@ -202,7 +180,7 @@ export const renameGenre = asyncHandler(
         ) {
             return res
                 .status(400)
-                .json(ApiResponse.success(400, "genre_name is required", null));
+                .json(ApiResponse.error(400, "genre_name is required", null));
         }
 
         try {
@@ -233,12 +211,12 @@ export const renameGenre = asyncHandler(
                     return res
                         .status(404)
                         .json(
-                            ApiResponse.success(404, "genre not found", { id })
+                            ApiResponse.error(404, "genre not found", { id })
                         );
                 }
                 if (err.code === "P2002") {
                     return res.status(409).json(
-                        ApiResponse.success(409, "genre name already in use", {
+                        ApiResponse.error(409, "genre name already in use", {
                             genre_name: cleanName(genre_name),
                         })
                     );
@@ -249,9 +227,7 @@ export const renameGenre = asyncHandler(
     }
 );
 
-/**
- * GET /api/genres
- */
+/** GET /api/genres */
 export const getGenres = asyncHandler(async (_req, res) => {
     const rows = await prisma.genres.findMany({
         orderBy: { name: "asc" },
@@ -280,15 +256,13 @@ export const getGenres = asyncHandler(async (_req, res) => {
     );
 });
 
-/**
- * GET /api/genres/:id
- */
+/** GET /api/genres/:id */
 export const getGenreById = asyncHandler(async (req, res) => {
     const id = parseId(req.params.id);
     if (!id) {
         return res
             .status(400)
-            .json(ApiResponse.success(400, "invalid id parameter", null));
+            .json(ApiResponse.error(400, "invalid id parameter", null));
     }
 
     const g = await prisma.genres.findUnique({
@@ -315,7 +289,7 @@ export const getGenreById = asyncHandler(async (req, res) => {
     if (!g) {
         return res
             .status(404)
-            .json(ApiResponse.success(404, "genre not found", { id }));
+            .json(ApiResponse.error(404, "genre not found", { id }));
     }
 
     res.status(200).json(
