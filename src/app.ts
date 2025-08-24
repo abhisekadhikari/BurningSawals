@@ -47,6 +47,11 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
  * Start the Express server
  * Listens on port 8080 and logs a startup message
  */
-app.listen(process.env.PORT ?? 8080, () => {
-    console.log("Server Started.");
+const PORT = process.env.PORT ?? 8080;
+const NODE_ENV = process.env.NODE_ENV ?? "development";
+
+app.listen(PORT, () => {
+    console.log("🚀 Server started successfully");
+    console.log(`📡 Listening on: http://localhost:${PORT}`);
+    console.log(`🌍 Environment: ${NODE_ENV}`);
 });
