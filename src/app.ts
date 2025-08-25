@@ -12,6 +12,8 @@ import genereRouter from "./routes/genere.routes";
 import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
 import questionRouer from "./routes/question.routes";
+import authRouter from "./routes/auth.routes";
+import "./services/auth.service";
 
 /**
  * Express application instance
@@ -24,12 +26,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // passport init.
-passport.initialize();
+app.use(passport.initialize());
 
 // API Routes
 app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
 app.use("/api/questions", questionRouer);
+app.use("/api", authRouter);
 
 /**
  * Global error handling middleware
