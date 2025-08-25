@@ -53,7 +53,7 @@ export async function requireAuth(
     }
 }
 
-/** Optional: role guard */
+/** role guard */
 export function requireRole(allowed: string | string[]) {
     const allowedSet = new Set(Array.isArray(allowed) ? allowed : [allowed]);
     return (req: Request, res: Response, next: NextFunction) => {
