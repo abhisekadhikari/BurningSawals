@@ -14,8 +14,6 @@ export type AuthClaims = {
 /** Extract JWE from Authorization header or cookie `et` */
 export function getTokenFromRequest(req: Request): string | undefined {
     const auth = req.headers.authorization;
-    console.log(req.headers);
-
     if (auth && auth.startsWith("Bearer ")) return auth.slice(7);
     return undefined;
 }
