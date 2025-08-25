@@ -84,8 +84,8 @@ passport.use(
                     process.env.JWT_SIGNING_SECRET!, // HS256 secret
                     {
                         expiresIn: "7d",
-                        audience: "your-web",
-                        issuer: "your-api",
+                        audience: "burning-sawals",
+                        issuer: "burning-sawals-api",
                     }
                 );
 
