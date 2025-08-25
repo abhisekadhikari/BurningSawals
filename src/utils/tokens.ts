@@ -45,8 +45,8 @@ export async function decryptAndVerify(jwe: string) {
 
     const secret = new TextEncoder().encode(process.env.JWT_SIGNING_SECRET!);
     const { payload, protectedHeader } = await jwtVerify(jws, secret, {
-        issuer: "your-api",
-        audience: "your-web",
+        issuer: "burning-sawals-api",
+        audience: "burning-sawals",
     });
     return payload; // verified payload
 }

@@ -14,6 +14,7 @@ import { ApiResponse } from "./utils/ApiResponse";
 import questionRouer from "./routes/question.routes";
 import authRouter from "./routes/auth.routes";
 import "./services/auth.service";
+import { AuthClaims, requireAuth } from "./middlewares/auth.middleware";
 
 /**
  * Express application instance
@@ -33,6 +34,12 @@ app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
 app.use("/api/questions", questionRouer);
 app.use("/api", authRouter);
+
+app.get("/test", requireAuth, (req, res) => {
+    return res.status(200).json({
+        user: req.user,
+    });
+});
 
 /**
  * Global error handling middleware

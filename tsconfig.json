@@ -8,6 +8,6 @@
         "resolveJsonModule": true,
         "rootDir": "./src",
         "outDir": "./dist"
-        // …etc
-    }
+    },
+    "include": ["src", "types"]
 }
