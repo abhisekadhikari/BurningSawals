@@ -1,6 +1,8 @@
 import passport, { DoneCallback } from "passport";
 import { prisma } from "../utils/prisma";
 import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
+import jwt from "jsonwebtoken";
+import { encryptJwt } from "../utils/tokens";
 
 passport.serializeUser((user: any, done) => {
     done(null, { id: user.id, email: user.email });
@@ -10,7 +12,7 @@ passport.deserializeUser(
     async (payload: { id: string; email: string }, done) => {
         try {
             const user = await prisma.users.findUnique({
-                where: { user_id: +payload.id },
+                where: { user_id: Number(payload.id) },
             });
             done(null, user);
         } catch (err) {
@@ -77,7 +79,23 @@ passport.use(
                     },
                 });
 
-                return done(null, dbUser);
+                const signedJwt = jwt.sign(
+                    { sub: String(dbUser.user_id), email: dbUser.email },
+                    process.env.JWT_SIGNING_SECRET!, // HS256 secret
+                    {
+                        expiresIn: "7d",
+                        audience: "your-web",
+                        issuer: "your-api",
+                    }
+                );
+
+                // --- encrypt the JWT into a JWE ---
+                const encrypted = await encryptJwt(signedJwt); // compact JWE string
+
+                // Pass both user and encrypted token forward
+                return done(null, { user: dbUser, token: encrypted });
+
+                // return done(null, dbUser);
             } catch (err) {
                 return done(err as Error);
             }
