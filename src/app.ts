@@ -7,6 +7,7 @@
  */
 
 import express, { NextFunction, Request, Response } from "express";
+import passport from "passport";
 import genereRouter from "./routes/genere.routes";
 import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
@@ -21,6 +22,9 @@ const app = express();
 // Middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// passport init.
+passport.initialize();
 
 // API Routes
 app.use("/api/genres", genereRouter);
