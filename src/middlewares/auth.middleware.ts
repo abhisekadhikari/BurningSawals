@@ -11,7 +11,7 @@ export type AuthClaims = {
     role?: string | string[];
 };
 
-/** Extract JWE from Authorization header or cookie `et` */
+/** Extract JWE from Authorization header */
 export function getTokenFromRequest(req: Request): string | undefined {
     const auth = req.headers.authorization;
     if (auth && auth.startsWith("Bearer ")) return auth.slice(7);
