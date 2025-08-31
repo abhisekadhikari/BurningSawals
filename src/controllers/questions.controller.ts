@@ -56,7 +56,9 @@ export const createQuestion = asyncHandler(
         const created = await prisma.questions.create({
             data: {
                 question: question.trim(),
-                ...(prompt && typeof prompt === "string" ? { prompt: prompt.trim() } : {}),
+                ...(prompt && typeof prompt === "string"
+                    ? { prompt: prompt.trim() }
+                    : {}),
                 question_genre_mappings: {
                     create: ids.map((gid) => ({
                         genres: { connect: { genre_id: BigInt(gid) } },
@@ -154,7 +156,9 @@ export const updateQuestion = asyncHandler(
             where: { question_id: BigInt(qid) },
             data: {
                 ...(question ? { question: question.trim() } : {}),
-                ...(prompt !== undefined ? { prompt: prompt ? prompt.trim() : null } : {}),
+                ...(prompt !== undefined
+                    ? { prompt: prompt ? prompt.trim() : null }
+                    : {}),
                 ...(ids.length
                     ? {
                           question_genre_mappings: {
@@ -183,6 +187,55 @@ export const updateQuestion = asyncHandler(
                 "question updated successfully",
                 toQuestionDTO(updated)
             )
+        );
+    }
+);
+
+// ------------------------ GET ALL (paginated) ------------------------
+export const getAllQuestions = asyncHandler(
+    async (req: Request, res: Response) => {
+        // Parse and sanitize pagination params
+        const pageNum =
+            typeof req.query.page === "string" ? Number(req.query.page) : NaN;
+        const limitNum =
+            typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
+
+        const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
+        const limit = Number.isFinite(limitNum) && limitNum > 0 ? limitNum : 20;
+        const skip = (page - 1) * limit;
+
+        // Count total rows for pagination metadata
+        const total = await prisma.questions.count();
+
+        // Fetch rows with relations
+        const rows = await prisma.questions.findMany({
+            skip,
+            take: limit,
+            orderBy: { created_at: "desc" },
+            include: {
+                question_genre_mappings: {
+                    include: {
+                        genres: {
+                            select: {
+                                genre_id: true,
+                                name: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const items = rows.map(toQuestionDTO);
+
+        return res.status(200).json(
+            ApiResponse.success(200, "questions retrieved successfully", {
+                items,
+                page,
+                limit,
+                total,
+                total_pages: Math.ceil(total / limit),
+            })
         );
     }
 );

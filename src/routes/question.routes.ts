@@ -3,6 +3,7 @@ import questionSchemaValidator from "../validators/question.validator";
 import { validator } from "../middlewares/validator.middleware";
 import {
     createQuestion,
+    getAllQuestions,
     getQuestionsByGenre,
     updateQuestion,
 } from "../controllers/questions.controller";
@@ -18,5 +19,7 @@ questionRouer.route("/genre/:genre_id").get(getQuestionsByGenre);
 questionRouer
     .route("/:question_id")
     .put(validator(questionSchemaValidator.updateQuestion), updateQuestion);
+
+questionRouer.route("/").get(getAllQuestions);
 
 export default questionRouer;
