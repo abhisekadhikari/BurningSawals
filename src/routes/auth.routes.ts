@@ -36,4 +36,6 @@ authRouter.get(
     }
 );
 
+authRouter.route("/auth/signin");
+
 export default authRouter;
