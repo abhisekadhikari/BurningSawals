@@ -15,19 +15,36 @@ const toIdArray = (v: unknown): number[] =>
         ? [...new Set(v.map(Number).filter((n) => Number.isFinite(n) && n > 0))]
         : [];
 
-/** DTO helpers for BigInt → Number */
-const toQuestionDTO = (q: any) => ({
-    question_id: Number(q.question_id),
-    question: q.question,
-    prompt: q.prompt,
-    created_at: q.created_at,
-    updated_at: q.updated_at,
-    genres:
+/** DTO helpers for BigInt → Number (now with types) */
+const toQuestionDTO = (q: any) => {
+    const genres =
         q.question_genre_mappings?.map((m: any) => ({
             genre_id: Number(m.genres.genre_id),
             name: m.genres.name,
-        })) ?? [],
-});
+            type_id: Number(m.genres.question_types?.type_id ?? 0),
+            type_name: m.genres.question_types?.type_name ?? null,
+        })) ?? [];
+
+    // Dedupe types across genres
+    const typeMap = new Map<number, string | null>();
+    for (const g of genres) {
+        if (g.type_id) typeMap.set(g.type_id, g.type_name ?? null);
+    }
+    const types = [...typeMap.entries()].map(([type_id, type_name]) => ({
+        type_id,
+        type_name,
+    }));
+
+    return {
+        question_id: Number(q.question_id),
+        question: q.question,
+        prompt: q.prompt,
+        created_at: q.created_at,
+        updated_at: q.updated_at,
+        genres,
+        types,
+    };
+};
 
 // ------------------------ CREATE ------------------------
 export const createQuestion = asyncHandler(
@@ -194,20 +211,20 @@ export const updateQuestion = asyncHandler(
 // ------------------------ GET ALL (paginated) ------------------------
 export const getAllQuestions = asyncHandler(
     async (req: Request, res: Response) => {
-        // Parse and sanitize pagination params
-        const pageNum =
+        // Parse pagination
+        const pageRaw =
             typeof req.query.page === "string" ? Number(req.query.page) : NaN;
-        const limitNum =
+        const limitRaw =
             typeof req.query.limit === "string" ? Number(req.query.limit) : NaN;
 
-        const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
-        const limit = Number.isFinite(limitNum) && limitNum > 0 ? limitNum : 20;
+        const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+        const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 20;
         const skip = (page - 1) * limit;
 
-        // Count total rows for pagination metadata
+        // Count for meta
         const total = await prisma.questions.count();
 
-        // Fetch rows with relations
+        // Fetch with nested types
         const rows = await prisma.questions.findMany({
             skip,
             take: limit,
@@ -219,6 +236,9 @@ export const getAllQuestions = asyncHandler(
                             select: {
                                 genre_id: true,
                                 name: true,
+                                question_types: {
+                                    select: { type_id: true, type_name: true },
+                                },
                             },
                         },
                     },
