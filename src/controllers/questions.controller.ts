@@ -5,6 +5,7 @@ import { ApiResponse } from "../utils/ApiResponse";
 
 type QuestionBody = {
     question?: string;
+    prompt?: string;
     genre_ids?: number[];
 };
 
@@ -18,6 +19,7 @@ const toIdArray = (v: unknown): number[] =>
 const toQuestionDTO = (q: any) => ({
     question_id: Number(q.question_id),
     question: q.question,
+    prompt: q.prompt,
     created_at: q.created_at,
     updated_at: q.updated_at,
     genres:
@@ -30,7 +32,7 @@ const toQuestionDTO = (q: any) => ({
 // ------------------------ CREATE ------------------------
 export const createQuestion = asyncHandler(
     async (req: Request<{}, {}, QuestionBody>, res: Response) => {
-        const { question, genre_ids } = req.body || {};
+        const { question, genre_ids, prompt } = req.body || {};
 
         if (!question || typeof question !== "string" || !question.trim()) {
             return res
@@ -54,6 +56,7 @@ export const createQuestion = asyncHandler(
         const created = await prisma.questions.create({
             data: {
                 question: question.trim(),
+                ...(prompt && typeof prompt === "string" ? { prompt: prompt.trim() } : {}),
                 question_genre_mappings: {
                     create: ids.map((gid) => ({
                         genres: { connect: { genre_id: BigInt(gid) } },
@@ -137,7 +140,7 @@ export const updateQuestion = asyncHandler(
         res: Response
     ) => {
         const qid = Number(req.params.question_id);
-        const { question, genre_ids } = req.body || {};
+        const { question, genre_ids, prompt } = req.body || {};
 
         if (Number.isNaN(qid)) {
             return res
@@ -151,6 +154,7 @@ export const updateQuestion = asyncHandler(
             where: { question_id: BigInt(qid) },
             data: {
                 ...(question ? { question: question.trim() } : {}),
+                ...(prompt !== undefined ? { prompt: prompt ? prompt.trim() : null } : {}),
                 ...(ids.length
                     ? {
                           question_genre_mappings: {

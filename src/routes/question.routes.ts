@@ -15,6 +15,8 @@ questionRouer
 
 questionRouer.route("/genre/:genre_id").get(getQuestionsByGenre);
 
-questionRouer.route("/:question_id").put(updateQuestion);
+questionRouer
+    .route("/:question_id")
+    .put(validator(questionSchemaValidator.updateQuestion), updateQuestion);
 
 export default questionRouer;
