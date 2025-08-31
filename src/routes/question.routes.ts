@@ -3,6 +3,7 @@ import questionSchemaValidator from "../validators/question.validator";
 import { validator } from "../middlewares/validator.middleware";
 import {
     createQuestion,
+    deleteQuestion,
     getAllQuestions,
     getQuestionsByGenre,
     updateQuestion,
@@ -21,5 +22,7 @@ questionRouer
     .put(validator(questionSchemaValidator.updateQuestion), updateQuestion);
 
 questionRouer.route("/").get(getAllQuestions);
+
+questionRouer.route("/:question_id").delete(deleteQuestion);
 
 export default questionRouer;

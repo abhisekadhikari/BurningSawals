@@ -259,3 +259,94 @@ export const getAllQuestions = asyncHandler(
         );
     }
 );
+
+export const deleteQuestion = asyncHandler(
+    async (req: Request<{ question_id: string }>, res: Response) => {
+        const rawId = req.params.question_id;
+        const qid = Number(rawId);
+
+        // Validate ID
+        if (!Number.isFinite(qid) || qid <= 0) {
+            return res
+                .status(400)
+                .json(
+                    ApiResponse.error(
+                        400,
+                        "validation error",
+                        "provide a valid question id."
+                    )
+                );
+        }
+
+        // Check existence (include relations so we can return a rich DTO if we delete)
+        const existing = await prisma.questions.findUnique({
+            where: { question_id: BigInt(qid) },
+            include: {
+                question_genre_mappings: {
+                    include: {
+                        genres: {
+                            select: {
+                                genre_id: true,
+                                name: true,
+                                // include type if you want it in the DTO
+                                question_types: {
+                                    select: { type_id: true, type_name: true },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        if (!existing) {
+            return res
+                .status(404)
+                .json(ApiResponse.error(404, "Question not found", null));
+        }
+
+        // Delete (cascade will remove mappings via schema)
+        await prisma.questions.delete({
+            where: { question_id: BigInt(qid) },
+        });
+
+        // Shape response
+        const toQuestionDTO = (q: any) => {
+            const genres =
+                q.question_genre_mappings?.map((m: any) => ({
+                    genre_id: Number(m.genres.genre_id),
+                    name: m.genres.name,
+                    type_id: Number(m.genres.question_types?.type_id ?? 0),
+                    type_name: m.genres.question_types?.type_name ?? null,
+                })) ?? [];
+
+            const types = [
+                ...new Map(
+                    genres
+                        .filter((g) => g.type_id)
+                        .map((g) => [g.type_id, g.type_name])
+                ).entries(),
+            ].map(([type_id, type_name]) => ({ type_id, type_name }));
+
+            return {
+                question_id: Number(q.question_id),
+                question: q.question,
+                prompt: q.prompt,
+                created_at: q.created_at,
+                updated_at: q.updated_at,
+                genres,
+                types,
+            };
+        };
+
+        return res
+            .status(200)
+            .json(
+                ApiResponse.success(
+                    200,
+                    "question deleted successfully",
+                    toQuestionDTO(existing)
+                )
+            );
+    }
+);
