@@ -43,6 +43,7 @@ model question_types {
 model questions {
   question_id             BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
   question                String                    @db.Text
+  prompt                  String?                   @db.Text
   created_at              DateTime?                 @default(now()) @db.Timestamp(0)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
   question_genre_mappings question_genre_mappings[]
