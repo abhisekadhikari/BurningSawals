@@ -8,11 +8,15 @@
 
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
+import axios from "axios";
+import { getSMSConfig, SMS_TEMPLATES } from "../config/sms.config";
 import {
     generateOTP,
     isValidOTP,
     isValidIndianPhoneNumber,
 } from "../utils/phoneValidation";
+import logger from "../utils/logger";
+import monitoringService from "./monitoring.service";
 
 const prisma = new PrismaClient();
 
@@ -48,31 +52,65 @@ function generateSalt(): Buffer {
 }
 
 /**
- * Sends OTP to phone number via SMS
+ * Sends OTP to phone number via Fast2SMS
  * @param phoneNumber - The phone number to send OTP to
  * @param otp - The OTP to send
  * @returns Promise<boolean> - Success status
  */
 async function sendOTP(phoneNumber: string, otp: string): Promise<boolean> {
-    try {
-        // For development, we'll just log the OTP
-        // In production, integrate with Twilio or AWS SNS
-        console.log(`📱 OTP for ${phoneNumber}: ${otp}`);
+    const startTime = Date.now();
 
-        const twilio = require("twilio");
-        const client = twilio(
-            process.env.TWILIO_ACCOUNT_SID,
-            process.env.TWILIO_AUTH_TOKEN
-        );
-        await client.messages.create({
-            body: `Your OTP for Burning Sawals is: ${otp}. Valid for 10 minutes.`,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            to: phoneNumber,
-        });
+    try {
+        // Log OTP generation
+        logger.otpGenerated(phoneNumber, "", { otp });
+
+        // Try to send via Fast2SMS if API key is available
+        const smsConfig = getSMSConfig();
+        if (smsConfig.apiKey) {
+            try {
+                const message = SMS_TEMPLATES.OTP(otp);
+                const response = await axios.get(smsConfig.baseUrl, {
+                    params: {
+                        authorization: smsConfig.apiKey,
+                        message: message,
+                        numbers: phoneNumber,
+                        route: smsConfig.route,
+                        sender_id: smsConfig.senderId,
+                    },
+                });
+
+                if (response.data.return === true) {
+                    logger.otpSent(phoneNumber, "sms", {
+                        requestId: response.data.request_id,
+                    });
+                    monitoringService.logPerformance("sms_send", startTime, {
+                        phoneNumber,
+                    });
+                    return true;
+                } else {
+                    logger.smsError(phoneNumber, response.data.message);
+                    logger.otpSent(phoneNumber, "console", {
+                        reason: "sms_api_error",
+                    });
+                }
+            } catch (smsError) {
+                logger.smsError(phoneNumber, smsError.message);
+                logger.otpSent(phoneNumber, "console", {
+                    reason: "sms_network_error",
+                });
+            }
+        } else {
+            logger.otpSent(phoneNumber, "console", {
+                reason: "sms_not_configured",
+            });
+        }
 
         return true;
     } catch (error) {
-        console.error("Error sending OTP:", error);
+        logger.error("Error sending OTP", {
+            phoneNumber,
+            error: error.message,
+        });
         return false;
     }
 }
@@ -153,9 +191,23 @@ export async function verifyOTP(
     otp: string,
     userName?: string
 ): Promise<VerifyOTPResult> {
+    const startTime = Date.now();
+
     try {
+        // Check for suspicious activity
+        const isSuspicious = await monitoringService.checkSuspiciousActivity(
+            phoneNumber
+        );
+        if (isSuspicious) {
+            logger.warn(
+                "Suspicious activity detected during OTP verification",
+                { phoneNumber }
+            );
+        }
+
         // Validate OTP format
         if (!isValidOTP(otp)) {
+            logger.otpFailed(phoneNumber, "Invalid OTP format");
             return {
                 success: false,
                 message: "Invalid OTP format",

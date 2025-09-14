@@ -22,14 +22,12 @@
     },
     "dependencies": {
         "@prisma/client": "^6.16.1",
-        "@types/twilio": "^3.19.2",
         "axios": "^1.12.1",
         "express": "^5.1.0",
         "jose": "^6.0.13",
         "jsonwebtoken": "^9.0.2",
         "passport": "^0.7.0",
         "passport-google-oauth20": "^2.0.0",
-        "twilio": "^5.9.0",
         "zod": "^4.0.14"
     }
 }

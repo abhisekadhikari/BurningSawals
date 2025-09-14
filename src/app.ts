@@ -14,6 +14,7 @@ import { ApiResponse } from "./utils/ApiResponse";
 import questionRouer from "./routes/question.routes";
 import authRouter from "./routes/auth.routes";
 import analyticsRouter from "./routes/analytics.routes";
+import monitoringRouter from "./routes/monitoring.routes";
 import "./services/auth.service";
 import { AuthClaims, requireAuth } from "./middlewares/auth.middleware";
 
@@ -35,6 +36,7 @@ app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
 app.use("/api/questions", questionRouer);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/monitoring", monitoringRouter);
 app.use("/api", authRouter);
 
 app.get("/test", requireAuth, (req, res) => {
