@@ -13,6 +13,7 @@ import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
 import questionRouer from "./routes/question.routes";
 import authRouter from "./routes/auth.routes";
+import analyticsRouter from "./routes/analytics.routes";
 import "./services/auth.service";
 import { AuthClaims, requireAuth } from "./middlewares/auth.middleware";
 
@@ -33,6 +34,7 @@ app.use(passport.initialize());
 app.use("/api/genres", genereRouter);
 app.use("/api/question-types", questionTypeRouter);
 app.use("/api/questions", questionRouer);
+app.use("/api/analytics", analyticsRouter);
 app.use("/api", authRouter);
 
 app.get("/test", requireAuth, (req, res) => {

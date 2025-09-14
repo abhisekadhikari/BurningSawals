@@ -14,14 +14,14 @@
         "@types/node": "^24.1.0",
         "@types/passport": "^1.0.17",
         "@types/passport-google-oauth20": "^2.0.16",
-        "prisma": "^6.12.0",
+        "prisma": "^6.16.1",
         "ts-node": "^10.9.2",
         "ts-node-dev": "^2.0.0",
         "tsc-watch": "^7.1.1",
         "typescript": "^5.8.3"
     },
     "dependencies": {
-        "@prisma/client": "^6.12.0",
+        "@prisma/client": "^6.16.1",
         "express": "^5.1.0",
         "jose": "^6.0.13",
         "jsonwebtoken": "^9.0.2",

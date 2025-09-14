@@ -41,23 +41,27 @@ model question_types {
 }
 
 model questions {
-  question_id             BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
-  question                String                    @db.Text
-  prompt                  String?                   @db.Text
-  created_at              DateTime?                 @default(now()) @db.Timestamp(0)
-  updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
-  question_genre_mappings question_genre_mappings[]
+  question_id                BigInt                      @id @default(autoincrement()) @db.UnsignedBigInt
+  question                   String                      @db.Text
+  prompt                     String?                     @db.Text
+  created_at                 DateTime?                   @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime?                   @default(now()) @db.Timestamp(0)
+  question_analytics_summary question_analytics_summary?
+  question_genre_mappings    question_genre_mappings[]
+  question_interactions      question_interactions[]
 }
 
 model users {
-  user_id       BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
-  user_name     String              @db.VarChar(200)
-  email         String              @unique(map: "uq_users_email") @db.VarChar(255)
-  auth_provider users_auth_provider
-  created_at    DateTime?           @default(now()) @db.Timestamp(0)
-  updated_at    DateTime?           @default(now()) @db.Timestamp(0)
-  last_login_at DateTime?           @db.Timestamp(0)
-  otps          otps[]
+  user_id                BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
+  user_name              String                  @db.VarChar(200)
+  email                  String                  @unique(map: "uq_users_email") @db.VarChar(255)
+  auth_provider          users_auth_provider
+  created_at             DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at             DateTime?               @default(now()) @db.Timestamp(0)
+  last_login_at          DateTime?               @db.Timestamp(0)
+  otps                   otps[]
+  question_interactions  question_interactions[]
+  user_analytics_summary user_analytics_summary?
 }
 
 model otps {
@@ -77,7 +81,61 @@ model otps {
   @@index([user_id, expires_at], map: "idx_user")
 }
 
+model question_analytics_summary {
+  question_id        BigInt    @id @db.UnsignedBigInt
+  total_likes        Int?      @default(0) @db.UnsignedInt
+  total_super_likes  Int?      @default(0) @db.UnsignedInt
+  total_dislikes     Int?      @default(0) @db.UnsignedInt
+  total_interactions Int?      @default(0) @db.UnsignedInt
+  last_updated       DateTime? @default(now()) @db.Timestamp(0)
+  questions          questions @relation(fields: [question_id], references: [question_id], onDelete: Cascade, map: "fk_analytics_question")
+
+  @@index([last_updated], map: "idx_last_updated")
+  @@index([total_dislikes], map: "idx_total_dislikes")
+  @@index([total_interactions], map: "idx_total_interactions")
+  @@index([total_likes], map: "idx_total_likes")
+  @@index([total_super_likes], map: "idx_total_super_likes")
+}
+
+model question_interactions {
+  interaction_id   BigInt                                 @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          BigInt                                 @db.UnsignedBigInt
+  question_id      BigInt                                 @db.UnsignedBigInt
+  interaction_type question_interactions_interaction_type
+  created_at       DateTime?                              @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?                              @default(now()) @db.Timestamp(0)
+  questions        questions                              @relation(fields: [question_id], references: [question_id], onDelete: Cascade, map: "fk_interaction_question")
+  users            users                                  @relation(fields: [user_id], references: [user_id], onDelete: Cascade, map: "fk_interaction_user")
+
+  @@unique([user_id, question_id, interaction_type], map: "uq_user_question_interaction")
+  @@index([created_at], map: "idx_created_at")
+  @@index([interaction_type], map: "idx_interaction_type")
+  @@index([question_id, interaction_type], map: "idx_question_interactions")
+  @@index([user_id, created_at], map: "idx_user_interactions")
+}
+
+model user_analytics_summary {
+  user_id                  BigInt    @id @db.UnsignedBigInt
+  total_likes_given        Int?      @default(0) @db.UnsignedInt
+  total_super_likes_given  Int?      @default(0) @db.UnsignedInt
+  total_dislikes_given     Int?      @default(0) @db.UnsignedInt
+  total_interactions_given Int?      @default(0) @db.UnsignedInt
+  last_updated             DateTime? @default(now()) @db.Timestamp(0)
+  users                    users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, map: "fk_user_analytics_user")
+
+  @@index([total_dislikes_given], map: "idx_total_dislikes_given")
+  @@index([total_interactions_given], map: "idx_total_interactions_given")
+  @@index([total_likes_given], map: "idx_total_likes_given")
+  @@index([total_super_likes_given], map: "idx_total_super_likes_given")
+}
+
 enum users_auth_provider {
   google
   facebook
+}
+
+enum question_interactions_interaction_type {
+  like
+  super_like
+  dislike
 }
