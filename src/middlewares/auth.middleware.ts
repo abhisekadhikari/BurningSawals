@@ -4,6 +4,7 @@ import { decryptAndVerify } from "../utils/tokens";
 export type AuthClaims = {
     sub: string;
     email?: string;
+    phone_number?: string;
     iat?: number;
     exp?: number;
     iss?: string;

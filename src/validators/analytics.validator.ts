@@ -49,10 +49,7 @@ const questionIdParam = z.object({
  */
 const interactionBody = z.object({
     interaction_type: z.enum(["like", "super_like", "dislike"], {
-        errorMap: () => ({
-            message:
-                "interaction_type must be one of: like, super_like, dislike",
-        }),
+        message: "interaction_type must be one of: like, super_like, dislike",
     }),
 });
 
@@ -115,18 +112,14 @@ const sortingQuery = z.object({
                 "created_at",
             ],
             {
-                errorMap: () => ({
-                    message:
-                        "sort_by must be one of: likes, super_likes, dislikes, total_interactions, created_at",
-                }),
+                message:
+                    "sort_by must be one of: likes, super_likes, dislikes, total_interactions, created_at",
             }
         )
         .optional(),
     sort_order: z
         .enum(["asc", "desc"], {
-            errorMap: () => ({
-                message: "sort_order must be one of: asc, desc",
-            }),
+            message: "sort_order must be one of: asc, desc",
         })
         .optional(),
 });
@@ -148,10 +141,7 @@ const sortingQuery = z.object({
 const topQuestionsQuery = z.object({
     type: z
         .enum(["likes", "super_likes", "dislikes", "total"], {
-            errorMap: () => ({
-                message:
-                    "type must be one of: likes, super_likes, dislikes, total",
-            }),
+            message: "type must be one of: likes, super_likes, dislikes, total",
         })
         .optional(),
     limit: z
