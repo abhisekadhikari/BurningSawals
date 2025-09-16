@@ -40,6 +40,7 @@ export const otpSchema = z
  */
 export const sendOTPBody = z.object({
     phone_number: phoneNumberSchema,
+    captcha_token: z.string().min(1, "CAPTCHA token is required"),
 });
 
 /**

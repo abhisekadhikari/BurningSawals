@@ -3,10 +3,16 @@ import passport from "passport";
 import { validator } from "../middlewares/validator.middleware";
 import phoneAuthValidator from "../validators/phoneAuth.validator";
 import { generateAndSendOTP, verifyOTP } from "../services/otp.service";
+import { verifyCaptcha } from "../services/captcha.service";
 import { makeSignedJwt, encryptJwt } from "../utils/tokens";
 import { ApiResponse } from "../utils/ApiResponse";
 import asyncHandler from "../utils/asyncHandler";
 import { prisma } from "../utils/prisma";
+import {
+    otpRateLimit,
+    usernameRateLimit,
+    verifyOtpRateLimit,
+} from "../middleware/rateLimiter";
 
 const authRouter = Router();
 
@@ -48,13 +54,23 @@ authRouter.get(
  * @desc    Send OTP to phone number for verification
  * @access  Public
  * @body    {string} phone_number - Indian phone number (10 digits)
+ * @body    {string} captcha_token - reCAPTCHA token
  * @returns {Object} Success message
  */
 authRouter.post(
     "/auth/phone/send-otp",
+    otpRateLimit,
     validator(phoneAuthValidator.sendOTPBody),
     asyncHandler(async (req, res) => {
-        const { phone_number } = req.body;
+        const { phone_number, captcha_token } = req.body;
+
+        // Verify CAPTCHA
+        const captchaResult = await verifyCaptcha(captcha_token, req.ip);
+        if (!captchaResult.success) {
+            return res
+                .status(400)
+                .json(ApiResponse.error(400, captchaResult.message, null));
+        }
 
         const result = await generateAndSendOTP(phone_number);
 
@@ -84,6 +100,7 @@ authRouter.post(
  */
 authRouter.post(
     "/auth/phone/verify-otp",
+    verifyOtpRateLimit,
     validator(phoneAuthValidator.verifyOTPBody),
     asyncHandler(async (req, res) => {
         const { phone_number, otp, user_name } = req.body;
@@ -152,6 +169,7 @@ authRouter.post(
  */
 authRouter.post(
     "/auth/check-username",
+    usernameRateLimit,
     validator(phoneAuthValidator.checkUsernameBody),
     asyncHandler(async (req, res) => {
         const { user_name } = req.body;

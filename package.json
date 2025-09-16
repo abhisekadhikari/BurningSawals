@@ -22,9 +22,10 @@
     },
     "dependencies": {
         "@prisma/client": "^6.16.1",
-        "axios": "^1.12.1",
+        "axios": "^1.12.2",
         "cors": "^2.8.5",
         "express": "^5.1.0",
+        "express-rate-limit": "^8.1.0",
         "jose": "^6.0.13",
         "jsonwebtoken": "^9.0.2",
         "passport": "^0.7.0",
