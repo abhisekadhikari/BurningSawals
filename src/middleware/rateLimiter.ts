@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // Rate limiter for OTP requests
 export const otpRateLimit = rateLimit({
@@ -14,7 +14,8 @@ export const otpRateLimit = rateLimit({
     keyGenerator: (req) => {
         // Use IP + phone number for more specific rate limiting
         const phone = req.body?.phone_number || "";
-        const ip = req.ip || req.connection.remoteAddress || "unknown";
+        // Use the built-in IP key generator for proper IPv6 handling
+        const ip = ipKeyGenerator(req.ip || "unknown");
         return `${ip}-${phone}`;
     },
 });
@@ -47,7 +48,8 @@ export const verifyOtpRateLimit = rateLimit({
     keyGenerator: (req) => {
         // Use IP + phone number for more specific rate limiting
         const phone = req.body?.phone_number || "";
-        const ip = req.ip || req.connection.remoteAddress || "unknown";
+        // Use the built-in IP key generator for proper IPv6 handling
+        const ip = ipKeyGenerator(req.ip || "unknown");
         return `${ip}-${phone}`;
     },
 });
