@@ -17,6 +17,7 @@ import analyticsRouter from "./routes/analytics.routes";
 import monitoringRouter from "./routes/monitoring.routes";
 import "./services/auth.service";
 import { AuthClaims, requireAuth } from "./middlewares/auth.middleware";
+import cors from "cors";
 
 /**
  * Express application instance
@@ -27,6 +28,7 @@ const app = express();
 // Middleware setup
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cors());
 
 // passport init.
 app.use(passport.initialize());
