@@ -24,6 +24,7 @@ export interface OTPResult {
     success: boolean;
     message: string;
     otpId?: bigint;
+    isExistingUser?: boolean;
 }
 
 export interface VerifyOTPResult {
@@ -132,6 +133,11 @@ export async function generateAndSendOTP(
             };
         }
 
+        // Check if user already exists
+        const existingUser = await prisma.users.findUnique({
+            where: { phone_number: phoneNumber },
+        });
+
         // Generate OTP
         const otp = generateOTP();
         const salt = generateSalt();
@@ -169,6 +175,7 @@ export async function generateAndSendOTP(
             success: true,
             message: "OTP sent successfully",
             otpId: otpRecord.otp_id,
+            isExistingUser: !!existingUser,
         };
     } catch (error) {
         console.error("Error generating OTP:", error);
@@ -280,11 +287,31 @@ export async function verifyOTP(
         let isNewUser = false;
 
         if (!user) {
-            // Create new user
+            // Create new user - username should be provided for new users
+            if (!userName) {
+                return {
+                    success: false,
+                    message: "Username is required for new users",
+                };
+            }
+
+            // Check if username is already taken
+            const existingUsername = await prisma.users.findFirst({
+                where: { user_name: userName },
+            });
+
+            if (existingUsername) {
+                return {
+                    success: false,
+                    message:
+                        "Username is already taken. Please choose a different username.",
+                };
+            }
+
             user = await prisma.users.create({
                 data: {
                     phone_number: phoneNumber,
-                    user_name: userName || `User_${phoneNumber}`,
+                    user_name: userName,
                     auth_provider: "phone",
                     is_phone_verified: true,
                 },

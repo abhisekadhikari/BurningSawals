@@ -43,7 +43,7 @@ export const sendOTPBody = z.object({
 });
 
 /**
- * Schema for verifying OTP request
+ * Schema for verifying OTP request (unified for login/registration)
  */
 export const verifyOTPBody = z.object({
     phone_number: phoneNumberSchema,
@@ -63,10 +63,25 @@ export const phoneLoginBody = z.object({
     otp: otpSchema,
 });
 
+/**
+ * Schema for checking username availability
+ */
+export const checkUsernameBody = z.object({
+    user_name: z
+        .string()
+        .min(1, "Username is required")
+        .max(200, "Username too long")
+        .regex(
+            /^[a-zA-Z0-9_]+$/,
+            "Username can only contain letters, numbers, and underscores"
+        ),
+});
+
 export default {
     phoneNumberSchema,
     otpSchema,
     sendOTPBody,
     verifyOTPBody,
     phoneLoginBody,
+    checkUsernameBody,
 };

@@ -6,6 +6,7 @@ import { generateAndSendOTP, verifyOTP } from "../services/otp.service";
 import { makeSignedJwt, encryptJwt } from "../utils/tokens";
 import { ApiResponse } from "../utils/ApiResponse";
 import asyncHandler from "../utils/asyncHandler";
+import { prisma } from "../utils/prisma";
 
 const authRouter = Router();
 
@@ -66,6 +67,7 @@ authRouter.post(
         return res.json(
             ApiResponse.success(200, result.message, {
                 otp_id: result.otpId?.toString(),
+                is_existing_user: result.isExistingUser,
             })
         );
     })
@@ -73,11 +75,11 @@ authRouter.post(
 
 /**
  * @route   POST /auth/phone/verify-otp
- * @desc    Verify OTP and create/login user
+ * @desc    Verify OTP and create/login user (unified endpoint)
  * @access  Public
  * @body    {string} phone_number - Indian phone number
  * @body    {string} otp - 6-digit OTP
- * @body    {string} [user_name] - Optional user name
+ * @body    {string} [user_name] - Required for new users, optional for existing users
  * @returns {Object} JWT token and user info
  */
 authRouter.post(
@@ -85,6 +87,24 @@ authRouter.post(
     validator(phoneAuthValidator.verifyOTPBody),
     asyncHandler(async (req, res) => {
         const { phone_number, otp, user_name } = req.body;
+
+        // Check if user exists first
+        const existingUser = await prisma.users.findUnique({
+            where: { phone_number: phone_number },
+        });
+
+        // If user doesn't exist and no username provided, return error
+        if (!existingUser && !user_name) {
+            return res
+                .status(400)
+                .json(
+                    ApiResponse.error(
+                        400,
+                        "Username is required for new users",
+                        null
+                    )
+                );
+        }
 
         const result = await verifyOTP(phone_number, otp, user_name);
 
@@ -124,50 +144,36 @@ authRouter.post(
 );
 
 /**
- * @route   POST /auth/phone/login
- * @desc    Login with phone number and OTP
+ * @route   POST /auth/check-username
+ * @desc    Check if username is available
  * @access  Public
- * @body    {string} phone_number - Indian phone number
- * @body    {string} otp - 6-digit OTP
- * @returns {Object} JWT token and user info
+ * @body    {string} user_name - Username to check
+ * @returns {Object} Username availability status
  */
 authRouter.post(
-    "/auth/phone/login",
-    validator(phoneAuthValidator.phoneLoginBody),
+    "/auth/check-username",
+    validator(phoneAuthValidator.checkUsernameBody),
     asyncHandler(async (req, res) => {
-        const { phone_number, otp } = req.body;
+        const { user_name } = req.body;
 
-        const result = await verifyOTP(phone_number, otp);
+        // Check if username is already taken
+        const existingUser = await prisma.users.findFirst({
+            where: { user_name: user_name },
+        });
 
-        if (!result.success) {
-            return res
-                .status(400)
-                .json(ApiResponse.error(400, result.message, null));
+        if (existingUser) {
+            return res.json(
+                ApiResponse.success(200, "Username is available", {
+                    available: false,
+                    message: "Username is already taken",
+                })
+            );
         }
 
-        // Create JWT payload
-        const payload = {
-            sub: result.userId?.toString(),
-            phone_number: phone_number,
-            iat: Math.floor(Date.now() / 1000),
-            exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
-            iss: "burning-sawals-api",
-            aud: "burning-sawals",
-        };
-
-        // Sign JWT
-        const jwtToken = await makeSignedJwt(payload);
-
-        // Encrypt JWT to create JWE
-        const jweToken = await encryptJwt(jwtToken);
-
         return res.json(
-            ApiResponse.success(200, "Login successful", {
-                token: jweToken,
-                user: {
-                    user_id: result.userId?.toString(),
-                    phone_number: phone_number,
-                },
+            ApiResponse.success(200, "Username is available", {
+                available: true,
+                message: "Username is available",
             })
         );
     })
