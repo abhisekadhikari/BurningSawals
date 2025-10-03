@@ -13,6 +13,7 @@ import questionTypeRouter from "./routes/questionTypes.routes";
 import { ApiResponse } from "./utils/ApiResponse";
 import questionRouer from "./routes/question.routes";
 import authRouter from "./routes/auth.routes";
+import emailAuthRouter from "./routes/emailAuth.routes";
 import analyticsRouter from "./routes/analytics.routes";
 import monitoringRouter from "./routes/monitoring.routes";
 import "./services/auth.service";
@@ -40,6 +41,7 @@ app.use("/api/questions", questionRouer);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/monitoring", monitoringRouter);
 app.use("/api", authRouter);
+app.use("/api", emailAuthRouter);
 
 app.get("/test", requireAuth, (req, res) => {
     return res.status(200).json({

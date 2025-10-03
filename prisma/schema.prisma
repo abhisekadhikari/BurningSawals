@@ -55,12 +55,12 @@ model users {
   user_id                BigInt                  @id @default(autoincrement()) @db.UnsignedBigInt
   user_name              String?                 @unique(map: "uq_users_username") @db.VarChar(200)
   email                  String?                 @unique(map: "uq_users_email") @db.VarChar(255)
-  phone_number           String?                 @unique(map: "uq_users_phone") @db.VarChar(15)
   auth_provider          users_auth_provider
-  is_phone_verified      Boolean?                @default(false)
   created_at             DateTime?               @default(now()) @db.Timestamp(0)
   updated_at             DateTime?               @default(now()) @db.Timestamp(0)
   last_login_at          DateTime?               @db.Timestamp(0)
+  is_phone_verified      Boolean?                @default(false)
+  phone_number           String?                 @unique(map: "uq_users_phone") @db.VarChar(15)
   otps                   otps[]
   question_interactions  question_interactions[]
   user_analytics_summary user_analytics_summary?
@@ -69,7 +69,6 @@ model users {
 model otps {
   otp_id       BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   user_id      BigInt?   @db.UnsignedBigInt
-  phone_number String?   @db.VarChar(15)
   otp_hash     Bytes     @db.VarBinary(64)
   salt         Bytes     @db.VarBinary(16)
   attempts     Int?      @default(0) @db.UnsignedInt
@@ -78,6 +77,8 @@ model otps {
   expires_at   DateTime  @db.DateTime(0)
   consumed_at  DateTime? @db.DateTime(0)
   updated_at   DateTime? @default(now()) @db.Timestamp(0)
+  phone_number String?   @db.VarChar(15)
+  email        String?   @db.VarChar(255)
   users        users?    @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "otp_fk_user_id")
 
   @@index([expires_at], map: "idx_expiry")
