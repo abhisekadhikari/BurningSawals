@@ -31,6 +31,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+    res.status(200).json({
+        status: "OK",
+        message: "Burning Sawals API is running",
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+    });
+});
+
 // passport init.
 app.use(passport.initialize());
 
@@ -72,8 +82,14 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const PORT = process.env.PORT ?? 8080;
 const NODE_ENV = process.env.NODE_ENV ?? "development";
 
-app.listen(PORT, () => {
-    console.log("🚀 Server started successfully");
-    console.log(`📡 Listening on: http://localhost:${PORT}`);
-    console.log(`🌍 Environment: ${NODE_ENV}`);
-});
+// Only start server if not in Vercel environment
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log("🚀 Server started successfully");
+        console.log(`📡 Listening on: http://localhost:${PORT}`);
+        console.log(`🌍 Environment: ${NODE_ENV}`);
+    });
+}
+
+// Export for Vercel
+export default app;

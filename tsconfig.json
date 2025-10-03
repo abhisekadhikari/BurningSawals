@@ -7,7 +7,15 @@
         "allowSyntheticDefaultImports": true,
         "resolveJsonModule": true,
         "rootDir": "./src",
-        "outDir": "./dist"
+        "outDir": "./dist",
+        "strict": false,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": false,
+        "noImplicitAny": false,
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true
     },
-    "include": ["src", "types"]
+    "include": ["src", "types"],
+    "exclude": ["node_modules", "dist"]
 }
