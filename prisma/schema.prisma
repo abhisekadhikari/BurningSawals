@@ -61,6 +61,7 @@ model users {
   last_login_at          DateTime?               @db.Timestamp(0)
   is_phone_verified      Boolean?                @default(false)
   phone_number           String?                 @unique(map: "uq_users_phone") @db.VarChar(15)
+  is_email_verified      Boolean?                @default(false)
   otps                   otps[]
   question_interactions  question_interactions[]
   user_analytics_summary user_analytics_summary?
@@ -84,6 +85,7 @@ model otps {
   @@index([expires_at], map: "idx_expiry")
   @@index([user_id, expires_at], map: "idx_user")
   @@index([phone_number, expires_at], map: "idx_phone_expiry")
+  @@index([email, expires_at], map: "idx_email_expiry")
 }
 
 model question_analytics_summary {
@@ -134,14 +136,15 @@ model user_analytics_summary {
   @@index([total_super_likes_given], map: "idx_total_super_likes_given")
 }
 
-enum users_auth_provider {
-  google
-  facebook
-  phone
-}
-
 enum question_interactions_interaction_type {
   like
   super_like
   dislike
+}
+
+enum users_auth_provider {
+  google
+  facebook
+  phone
+  email
 }

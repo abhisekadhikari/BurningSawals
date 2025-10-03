@@ -1,31 +1,20 @@
 import express from "express";
-import { body } from "express-validator";
-import { asyncHandler } from "../middleware/asyncHandler";
-import { validator } from "../middleware/validator";
-import { ApiResponse } from "../utils/apiResponse";
+import asyncHandler from "../utils/asyncHandler";
+import { validator } from "../middlewares/validator.middleware";
+import { ApiResponse } from "../utils/ApiResponse";
 import {
     generateAndSendEmailOTP,
     verifyEmailOTP,
 } from "../services/emailOtp.service";
 import { makeSignedJwt, encryptJwt } from "../utils/tokens";
-import { PrismaClient } from "@prisma/client";
-import { rateLimiter } from "../middleware/rateLimiter";
+import { prisma } from "../utils/prisma";
+import { otpRateLimit, verifyOtpRateLimit } from "../middleware/rateLimiter";
+import emailAuthValidator from "../validators/emailAuth.validator";
+import { verifyCaptcha } from "../services/captcha.service";
 
 const emailAuthRouter = express.Router();
-const prisma = new PrismaClient();
 
-// Rate limiting for email OTP endpoints
-const emailOtpRateLimit = rateLimiter({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 requests per window
-    message: "Too many OTP requests. Please try again later.",
-});
-
-const verifyOtpRateLimit = rateLimiter({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 verification attempts per window
-    message: "Too many verification attempts. Please try again later.",
-});
+// Rate limiting for email OTP endpoints - using existing rate limiters
 
 /**
  * @route   POST /auth/email/send-otp
@@ -37,25 +26,18 @@ const verifyOtpRateLimit = rateLimiter({
  */
 emailAuthRouter.post(
     "/auth/email/send-otp",
-    emailOtpRateLimit,
-    validator([
-        body("email")
-            .isEmail()
-            .withMessage("Valid email address is required")
-            .normalizeEmail()
-            .isLength({ min: 5, max: 255 })
-            .withMessage("Email must be between 5 and 255 characters"),
-        body("captcha_token")
-            .notEmpty()
-            .withMessage("Captcha token is required")
-            .isString()
-            .withMessage("Captcha token must be a string"),
-    ]),
+    otpRateLimit,
+    validator(emailAuthValidator.sendOTPBody),
     asyncHandler(async (req, res) => {
         const { email, captcha_token } = req.body;
 
-        // TODO: Verify captcha token here
-        // For now, we'll skip captcha verification
+        // Verify reCAPTCHA token
+        const captchaResult = await verifyCaptcha(captcha_token);
+        if (!captchaResult.success) {
+            return res
+                .status(400)
+                .json(ApiResponse.error(400, captchaResult.message, null));
+        }
 
         const result = await generateAndSendEmailOTP(email);
 
@@ -85,27 +67,7 @@ emailAuthRouter.post(
 emailAuthRouter.post(
     "/auth/email/verify-otp",
     verifyOtpRateLimit,
-    validator([
-        body("email")
-            .isEmail()
-            .withMessage("Valid email address is required")
-            .normalizeEmail()
-            .isLength({ min: 5, max: 255 })
-            .withMessage("Email must be between 5 and 255 characters"),
-        body("otp")
-            .isLength({ min: 6, max: 6 })
-            .withMessage("OTP must be exactly 6 digits")
-            .isNumeric()
-            .withMessage("OTP must contain only numbers"),
-        body("user_name")
-            .optional()
-            .isLength({ min: 3, max: 50 })
-            .withMessage("Username must be between 3 and 50 characters")
-            .matches(/^[a-zA-Z0-9_-]+$/)
-            .withMessage(
-                "Username can only contain letters, numbers, hyphens, and underscores"
-            ),
-    ]),
+    validator(emailAuthValidator.verifyOTPBody),
     asyncHandler(async (req, res) => {
         const { email, otp, user_name } = req.body;
 

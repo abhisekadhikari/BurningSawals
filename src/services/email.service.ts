@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import * as nodemailer from "nodemailer";
 
 interface EmailConfig {
     host: string;
@@ -43,7 +43,7 @@ class EmailService {
                 },
             };
 
-            this.transporter = nodemailer.createTransporter(this.config);
+            this.transporter = nodemailer.createTransport(this.config);
             console.log("Email service initialized successfully");
         } catch (error) {
             console.error("Failed to initialize email service:", error);

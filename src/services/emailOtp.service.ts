@@ -1,26 +1,43 @@
 import { PrismaClient } from "@prisma/client";
-import {
-    generateOTP,
-    generateSalt,
-    hashOTP,
-    isValidOTP,
-} from "../utils/phoneValidation";
+import { generateOTP, isValidOTP } from "../utils/phoneValidation";
 import { emailService } from "./email.service";
 import { validateEmailForOTP, normalizeEmail } from "../utils/emailValidation";
+import crypto from "crypto";
 
 const prisma = new PrismaClient();
+
+/**
+ * Generates a random salt for OTP hashing
+ * @returns Buffer - Random salt
+ */
+function generateSalt(): Buffer {
+    return crypto.randomBytes(16);
+}
+
+/**
+ * Hashes OTP with salt using SHA-256
+ * @param otp - The OTP to hash
+ * @param salt - The salt to use
+ * @returns string - Hex-encoded hash
+ */
+function hashOTP(otp: string, salt: Buffer): string {
+    return crypto
+        .createHash("sha256")
+        .update(otp + salt.toString("hex"))
+        .digest("hex");
+}
 
 export interface EmailOTPResult {
     success: boolean;
     message: string;
-    otpId?: number;
+    otpId?: bigint;
     isExistingUser?: boolean;
 }
 
 export interface VerifyEmailOTPResult {
     success: boolean;
     message: string;
-    userId?: number;
+    userId?: bigint;
     isNewUser?: boolean;
 }
 
@@ -191,55 +208,57 @@ export async function verifyEmailOTP(
             },
         });
 
-        // Check if user exists
-        let user = await prisma.users.findUnique({
-            where: { email: normalizedEmail },
+        // Use database transaction for user creation/update
+        const result = await prisma.$transaction(async (tx) => {
+            // Check if user exists
+            let user = await tx.users.findUnique({
+                where: { email: normalizedEmail },
+            });
+
+            let isNewUser = false;
+
+            if (!user) {
+                // Create new user - username should be provided for new users
+                if (!userName) {
+                    throw new Error("Username is required for new users");
+                }
+
+                // Check if username is already taken
+                const existingUsername = await tx.users.findFirst({
+                    where: { user_name: userName },
+                });
+
+                if (existingUsername) {
+                    throw new Error(
+                        "Username is already taken. Please choose a different username."
+                    );
+                }
+
+                user = await tx.users.create({
+                    data: {
+                        email: normalizedEmail,
+                        user_name: userName,
+                        auth_provider: "email",
+                        is_email_verified: true,
+                    },
+                });
+                isNewUser = true;
+            } else {
+                // Update existing user
+                user = await tx.users.update({
+                    where: { user_id: user.user_id },
+                    data: {
+                        is_email_verified: true,
+                        last_login_at: new Date(),
+                        updated_at: new Date(),
+                    },
+                });
+            }
+
+            return { user, isNewUser };
         });
 
-        let isNewUser = false;
-
-        if (!user) {
-            // Create new user - username should be provided for new users
-            if (!userName) {
-                return {
-                    success: false,
-                    message: "Username is required for new users",
-                };
-            }
-
-            // Check if username is already taken
-            const existingUsername = await prisma.users.findFirst({
-                where: { user_name: userName },
-            });
-
-            if (existingUsername) {
-                return {
-                    success: false,
-                    message:
-                        "Username is already taken. Please choose a different username.",
-                };
-            }
-
-            user = await prisma.users.create({
-                data: {
-                    email: normalizedEmail,
-                    user_name: userName,
-                    auth_provider: "email",
-                    is_email_verified: true,
-                },
-            });
-            isNewUser = true;
-        } else {
-            // Update existing user
-            user = await prisma.users.update({
-                where: { user_id: user.user_id },
-                data: {
-                    is_email_verified: true,
-                    last_login_at: new Date(),
-                    updated_at: new Date(),
-                },
-            });
-        }
+        const { user, isNewUser } = result;
 
         return {
             success: true,
@@ -251,6 +270,24 @@ export async function verifyEmailOTP(
         };
     } catch (error) {
         console.error("Error verifying email OTP:", error);
+
+        // Handle specific error cases
+        if (error instanceof Error) {
+            if (error.message.includes("Username is required")) {
+                return {
+                    success: false,
+                    message: "Username is required for new users",
+                };
+            }
+            if (error.message.includes("Username is already taken")) {
+                return {
+                    success: false,
+                    message:
+                        "Username is already taken. Please choose a different username.",
+                };
+            }
+        }
+
         return {
             success: false,
             message: "Failed to verify OTP",
