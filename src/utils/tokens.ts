@@ -15,8 +15,8 @@ export async function makeSignedJwt(payload: JWTPayload) {
         .setProtectedHeader({ alg: "HS256", typ: "JWT" })
         .setIssuedAt()
         .setExpirationTime("7d")
-        .setIssuer("your-api")
-        .setAudience("your-web")
+        .setIssuer("burning-sawals-api")
+        .setAudience("burning-sawals")
         .sign(secret);
     return token; // compact JWS
 }
