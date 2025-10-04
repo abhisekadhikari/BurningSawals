@@ -20,6 +20,30 @@ import "./services/auth.service";
 import { AuthClaims, requireAuth } from "./middlewares/auth.middleware";
 import cors from "cors";
 
+// Validate required environment variables at startup
+const validateEnvironmentVariables = () => {
+    const requiredVars = [
+        "JWT_SIGNING_SECRET",
+        "JWT_ENC_PUBLIC_JWK",
+        "JWT_ENC_PRIVATE_JWK",
+        "DATABASE_URL",
+    ];
+
+    const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+        console.error("Missing required environment variables:", missingVars);
+        throw new Error(
+            `Missing required environment variables: ${missingVars.join(", ")}`
+        );
+    }
+
+    console.log("✅ All required environment variables are present");
+};
+
+// Validate environment variables at startup
+validateEnvironmentVariables();
+
 /**
  * Express application instance
  * @type {express.Application}
@@ -38,6 +62,35 @@ app.get("/api/health", (req, res) => {
         message: "Burning Sawals API is running",
         timestamp: new Date().toISOString(),
         environment: process.env.NODE_ENV || "development",
+    });
+});
+
+// Debug endpoint for environment variables (remove in production)
+app.get("/api/debug/env", (req, res) => {
+    const envInfo = {
+        JWT_SIGNING_SECRET: {
+            exists: !!process.env.JWT_SIGNING_SECRET,
+            length: process.env.JWT_SIGNING_SECRET?.length || 0,
+        },
+        JWT_ENC_PUBLIC_JWK: {
+            exists: !!process.env.JWT_ENC_PUBLIC_JWK,
+            length: process.env.JWT_ENC_PUBLIC_JWK?.length || 0,
+            hasKty: process.env.JWT_ENC_PUBLIC_JWK?.includes('"kty"') || false,
+        },
+        JWT_ENC_PRIVATE_JWK: {
+            exists: !!process.env.JWT_ENC_PRIVATE_JWK,
+            length: process.env.JWT_ENC_PRIVATE_JWK?.length || 0,
+            hasKty: process.env.JWT_ENC_PRIVATE_JWK?.includes('"kty"') || false,
+        },
+        DATABASE_URL: {
+            exists: !!process.env.DATABASE_URL,
+            length: process.env.DATABASE_URL?.length || 0,
+        },
+    };
+
+    res.status(200).json({
+        message: "Environment variables debug info",
+        envInfo,
     });
 });
 

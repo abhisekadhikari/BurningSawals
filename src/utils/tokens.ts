@@ -1,20 +1,28 @@
 import { getEncPublicKey, getEncPrivateKey } from "../config/crypto/config";
 
-// Dynamic imports for jose (ES module)
-let SignJWT: any;
-let CompactEncrypt: any;
-let jwtVerify: any;
-let importJWK: any;
+// Import jose with proper error handling
+let jose: any = null;
 
 // Initialize jose modules
 async function initJose() {
-    if (!SignJWT) {
-        const jose = await import("jose");
-        SignJWT = jose.SignJWT;
-        CompactEncrypt = jose.CompactEncrypt;
-        jwtVerify = jose.jwtVerify;
-        importJWK = jose.importJWK;
+    if (!jose) {
+        try {
+            // Try dynamic import first
+            jose = await eval('import("jose")');
+        } catch (error) {
+            console.error("Dynamic import failed:", error);
+            try {
+                // Fallback to require
+                jose = require("jose");
+            } catch (requireError) {
+                console.error("Require also failed:", requireError);
+                throw new Error(
+                    "Failed to load jose library. Please ensure it is installed."
+                );
+            }
+        }
     }
+    return jose;
 }
 
 // Types
@@ -28,9 +36,21 @@ interface JWK {
 
 // 3.a Sign (JWS)
 export async function makeSignedJwt(payload: JWTPayload) {
-    await initJose();
+    const joseLib = await initJose();
+
+    // Debug environment variables
+    console.log("JWT_SIGNING_SECRET exists:", !!process.env.JWT_SIGNING_SECRET);
+    console.log(
+        "JWT_SIGNING_SECRET length:",
+        process.env.JWT_SIGNING_SECRET?.length || 0
+    );
+
+    if (!process.env.JWT_SIGNING_SECRET) {
+        throw new Error("JWT_SIGNING_SECRET environment variable is not set");
+    }
+
     const secret = new TextEncoder().encode(process.env.JWT_SIGNING_SECRET!); // symmetric HMAC (HS256)
-    const token = await new SignJWT(payload)
+    const token = await new joseLib.SignJWT(payload)
         .setProtectedHeader({ alg: "HS256", typ: "JWT" })
         .setIssuedAt()
         .setExpirationTime("7d")
@@ -42,30 +62,39 @@ export async function makeSignedJwt(payload: JWTPayload) {
 
 // 3.b Encrypt that JWS into a JWE
 export async function encryptJwt(jws: string) {
-    await initJose();
-    const publicKey = await getEncPublicKey();
-    const jwe = await new CompactEncrypt(new TextEncoder().encode(jws))
-        .setProtectedHeader({
-            alg: "RSA-OAEP-256",
-            enc: "A256GCM",
-            kid: "key-2025-08",
-            typ: "JWE",
-        })
-        .encrypt(publicKey);
-    return jwe; // compact JWE string
+    try {
+        const joseLib = await initJose();
+        const publicKey = await getEncPublicKey();
+
+        // Debug: Log key information
+        console.log("Public key loaded successfully");
+
+        const jwe = await new joseLib.CompactEncrypt(
+            new TextEncoder().encode(jws)
+        )
+            .setProtectedHeader({
+                alg: "RSA-OAEP-256",
+                enc: "A256GCM",
+                kid: "key-2025-08",
+                typ: "JWE",
+            })
+            .encrypt(publicKey);
+        return jwe; // compact JWE string
+    } catch (error) {
+        console.error("Error in encryptJwt:", error);
+        throw new Error(`JWT encryption failed: ${error.message}`);
+    }
 }
 
 // 3.c Decrypt the JWE back to JWS, then verify
 export async function decryptAndVerify(jwe: string) {
-    await initJose();
+    const joseLib = await initJose();
     const privateKey = await getEncPrivateKey();
-    const { plaintext } = await (
-        await import("jose")
-    ).compactDecrypt(jwe, privateKey);
+    const { plaintext } = await joseLib.compactDecrypt(jwe, privateKey);
     const jws = new TextDecoder().decode(plaintext);
 
     const secret = new TextEncoder().encode(process.env.JWT_SIGNING_SECRET!);
-    const { payload, protectedHeader } = await jwtVerify(jws, secret, {
+    const { payload, protectedHeader } = await joseLib.jwtVerify(jws, secret, {
         issuer: "burning-sawals-api",
         audience: "burning-sawals",
     });

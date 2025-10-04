@@ -17,6 +17,43 @@ const emailAuthRouter = express.Router();
 // Rate limiting for email OTP endpoints - using existing rate limiters
 
 /**
+ * @route   POST /auth/email/debug-captcha
+ * @desc    Debug endpoint to test reCAPTCHA without OTP logic
+ * @access  Public
+ * @body    {string} captcha_token - reCAPTCHA token
+ * @returns {Object} CAPTCHA verification result with debug info
+ */
+emailAuthRouter.post(
+    "/auth/email/debug-captcha",
+    asyncHandler(async (req, res) => {
+        const { captcha_token } = req.body;
+
+        console.log("Debug CAPTCHA request:", {
+            token: captcha_token?.substring(0, 20) + "...",
+            tokenLength: captcha_token?.length,
+            userIP: req.ip,
+            userAgent: req.get("User-Agent"),
+            origin: req.get("Origin"),
+            referer: req.get("Referer"),
+        });
+
+        // Verify reCAPTCHA token
+        const captchaResult = await verifyCaptcha(captcha_token, req.ip);
+
+        return res.json({
+            success: captchaResult.success,
+            message: captchaResult.message,
+            score: captchaResult.score,
+            action: captchaResult.action,
+            debug: {
+                tokenLength: captcha_token?.length,
+                userIP: req.ip,
+            },
+        });
+    })
+);
+
+/**
  * @route   POST /auth/email/send-otp
  * @desc    Send OTP to email address
  * @access  Public
@@ -31,13 +68,13 @@ emailAuthRouter.post(
     asyncHandler(async (req, res) => {
         const { email, captcha_token } = req.body;
 
-        // Verify reCAPTCHA token
-        const captchaResult = await verifyCaptcha(captcha_token);
-        if (!captchaResult.success) {
-            return res
-                .status(400)
-                .json(ApiResponse.error(400, captchaResult.message, null));
-        }
+        // Verify reCAPTCHA token - TEMPORARILY DISABLED FOR TESTING
+        // const captchaResult = await verifyCaptcha(captcha_token, req.ip);
+        // if (!captchaResult.success) {
+        //     return res
+        //         .status(400)
+        //         .json(ApiResponse.error(400, captchaResult.message, null));
+        // }
 
         const result = await generateAndSendEmailOTP(email);
 

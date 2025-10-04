@@ -24,11 +24,16 @@ export async function verifyCaptcha(
         const verificationURL =
             "https://www.google.com/recaptcha/api/siteverify";
 
-        const response = await axios.post(verificationURL, null, {
-            params: {
-                secret: secretKey,
-                response: captchaToken,
-                remoteip: userIP,
+        const formData = new URLSearchParams();
+        formData.append("secret", secretKey);
+        formData.append("response", captchaToken);
+        if (userIP) {
+            formData.append("remoteip", userIP);
+        }
+
+        const response = await axios.post(verificationURL, formData, {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
             },
         });
 
@@ -38,6 +43,33 @@ export async function verifyCaptcha(
             action,
             "error-codes": errorCodes,
         } = response.data;
+
+        console.log("reCAPTCHA API Response:", {
+            success,
+            score,
+            action,
+            errorCodes,
+            responseData: response.data,
+        });
+
+        // Log token info for debugging
+        console.log("reCAPTCHA Token Info:", {
+            tokenLength: captchaToken?.length,
+            tokenPrefix: captchaToken?.substring(0, 10) + "...",
+            userIP: userIP || "not provided",
+        });
+
+        // Check if the response indicates an error
+        if (response.status !== 200) {
+            console.error(
+                "reCAPTCHA API returned non-200 status:",
+                response.status
+            );
+            return {
+                success: false,
+                message: `CAPTCHA verification failed with status ${response.status}`,
+            };
+        }
 
         if (!success) {
             const errorMessage =
@@ -73,6 +105,22 @@ export async function verifyCaptcha(
         };
     } catch (error) {
         console.error("CAPTCHA verification error:", error);
+
+        // If it's an axios error, try to get the response data
+        if (error.response && error.response.data) {
+            console.error("reCAPTCHA API Error Response:", error.response.data);
+
+            // If we have error codes, return them
+            if (error.response.data["error-codes"]) {
+                return {
+                    success: false,
+                    message: `CAPTCHA verification failed: ${error.response.data[
+                        "error-codes"
+                    ].join(", ")}`,
+                };
+            }
+        }
+
         return {
             success: false,
             message: "Failed to verify CAPTCHA",

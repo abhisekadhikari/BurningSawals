@@ -1,14 +1,16 @@
-import { generateKeyPair, exportJWK, JWK } from "jose";
-
+// Dynamic import for jose (ES module)
 (async () => {
+    const jose = await eval('import("jose")');
+    const { generateKeyPair, exportJWK } = jose;
+
     // Make the keys extractable so exportJWK can serialize them
     const { publicKey, privateKey } = await generateKeyPair("RSA-OAEP-256", {
         modulusLength: 2048,
         extractable: true,
     });
 
-    const pubJwk = (await exportJWK(publicKey)) as JWK;
-    const privJwk = (await exportJWK(privateKey)) as JWK;
+    const pubJwk = await exportJWK(publicKey);
+    const privJwk = await exportJWK(privateKey);
 
     // optional: add a key id for rotation
     pubJwk.kid = privJwk.kid = "key-2025-08";

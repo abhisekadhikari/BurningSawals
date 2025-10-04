@@ -64,13 +64,13 @@ authRouter.post(
     asyncHandler(async (req, res) => {
         const { phone_number, captcha_token } = req.body;
 
-        // Verify CAPTCHA
-        const captchaResult = await verifyCaptcha(captcha_token, req.ip);
-        if (!captchaResult.success) {
-            return res
-                .status(400)
-                .json(ApiResponse.error(400, captchaResult.message, null));
-        }
+        // Verify CAPTCHA - TEMPORARILY DISABLED FOR TESTING
+        // const captchaResult = await verifyCaptcha(captcha_token, req.ip);
+        // if (!captchaResult.success) {
+        //     return res
+        //         .status(400)
+        //         .json(ApiResponse.error(400, captchaResult.message, null));
+        // }
 
         const result = await generateAndSendOTP(phone_number);
 
